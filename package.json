@@ -1,0 +1,13 @@
+{
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "scripts": {
+    "start": "concurrently \"cd server && node server.js\" \"cd client && npm run dev\"",
+    "server": "cd server && node server.js",
+    "client": "cd client && npm run dev"
+  },
+  "dependencies": {
+    "react-router-dom": "^7.6.2"
+  }
+}
