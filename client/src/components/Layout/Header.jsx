@@ -1,25 +1,32 @@
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
 
 export default function Header() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate(); // Moved to top level
+  
+const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+const handleLogout = async () => {
+  setLogoutLoading(true);
+  try {
+    const success = await logout();
+    if (success) navigate('/login');
+  } finally {
+    setLogoutLoading(false);
     setMobileMenuOpen(false);
-  };
+  }
+};
 
   return (
     <header className="bg-white shadow sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-2 py-1 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           {/* Logo */}
-          <Link to="/" className="flex  items-center">
+          <Link to="/" className="flex items-center">
             <div className="bg-indigo-600 p-2 rounded-lg">
               <svg className="h-3 w-3 md:h-6 md:w-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />

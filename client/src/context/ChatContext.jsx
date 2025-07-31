@@ -1,98 +1,40 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useSocket } from '../services/socket.js';
-import { getUsers, getMessages } from '../services/api.js';
+import { chatAPI } from '../services/api.js';
 import { useAuth } from './AuthContext.jsx';
 
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
   const { user } = useAuth();
-  const { socket, isConnected, connectionError } = useSocket();
-  const [isReady, setIsReady] = useState(false);
-  // const [messages, setMessages] = useState([]);
-const tempMessages = useRef({});
-
-   // Add socket connection check
-  // Wait until socket is fully initialized
-  // Verify socket is fully ready,
-  useEffect(() => {
-    if (socket && isConnected && !connectionError) {
-      setIsReady(true);
-    } else {
-      setIsReady(false);
-    }
-  }, [socket, isConnected, connectionError]);
-
-  //  console.error("Socket connection established!");
+  const { socket, isConnected } = useSocket();
+  
   // State declarations
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [typingUsers, setTypingUsers] = useState([]);
+  const [typingUsers, setTypingUsers] = useState(new Set());
   const [unreadCounts, setUnreadCounts] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
   
   // Refs for timeouts
   const typingTimeout = useRef(null);
   const messageStatusTimeout = useRef(null);
 
-
-    // Add to socket effects:
+  // Initialize chat when user is authenticated
   useEffect(() => {
-    if (socket) {
-      socket.on('userStatusChanged', ({ userId, isOnline }) => {
-        setUsers(prev => prev.map(user => 
-          user._id === userId ? { ...user, isOnline } : user
-        ));
-        setOnlineUsers(prev => 
-          isOnline 
-            ? [...prev, userId]
-            : prev.filter(id => id !== userId)
-        );
-      });
-
-      socket.on('updateReactions', (updatedMessage) => {
-        setMessages(prev => prev.map(msg =>
-          msg._id === updatedMessage._id ? updatedMessage : msg
-        ));
-      });
-
-      return () => {
-        socket.off('userStatusChanged');
-        socket.off('updateReactions');
-      };
-    }
-  }, [socket]); 
-     useEffect(() => {
-    if (socket && isConnected) {
-      // Set up all socket listeners here
-      const messageHandler = (message) => {
-        // Handle new message
-      };
-
-      socket.on('receiveMessage', messageHandler);
-
-      // Mark socket as ready
-      setIsReady(true);
-
-      return () => {
-        socket.off('receiveMessage', messageHandler);
-      };
-    }
-  }, [socket, isConnected]);
-
-
-  // Fetch users and setup socket listeners
-  useEffect(() => {
-    if (user) {
+    if (user && socket && isConnected) {
       fetchUsers();
       setupSocketListeners();
     }
+  }, [user, socket, isConnected]);
 
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       if (socket) {
         socket.off('receiveMessage');
@@ -101,30 +43,46 @@ const tempMessages = useRef({});
         socket.off('updateReactions');
         socket.off('messageEdited');
         socket.off('messageDeleted');
+        socket.off('userStatusChanged');
+        socket.off('messagesRead');
       }
       clearTimeout(typingTimeout.current);
       clearTimeout(messageStatusTimeout.current);
     };
-  }, [user, socket]);
+  }, [socket]);
 
-  const setupSocketListeners = () => {
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) return;
+    
+    // Message handling
     socket.on('receiveMessage', handleNewMessage);
+    
+    // Typing indicators
     socket.on('typing', handleTyping);
     socket.on('stopTyping', handleStopTyping);
+    
+    // Message updates
     socket.on('updateReactions', handleReactionUpdate);
     socket.on('messageEdited', handleMessageEdited);
     socket.on('messageDeleted', handleMessageDeleted);
-  };
+    
+    // User status changes
+    socket.on('userStatusChanged', handleUserStatusChange);
+    
+    // Message read receipts
+    socket.on('messagesRead', handleMessagesRead);
+  }, [socket]);
 
   // Fetch all users except current user
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await getUsers();
-      setUsers(data);
       setError(null);
+      const data = await chatAPI.getUsers();
+      setUsers(data);
     } catch (err) {
       setError(err.message);
+      console.error('Error fetching users:', err);
     } finally {
       setLoading(false);
     }
@@ -134,26 +92,30 @@ const tempMessages = useRef({});
   const fetchMessages = async (receiverId) => {
     try {
       setLoading(true);
-      const data = await getMessages(receiverId);
-      setMessages(data);
       setError(null);
+      const data = await chatAPI.getMessages(receiverId);
+      setMessages(data);
       
       // Mark messages as read
-      if (data.length > 0) {
+      if (data.length > 0 && socket) {
         socket.emit('markAsRead', {
           senderId: receiverId,
           receiverId: user.userId
         });
       }
+      
+      // Clear unread count for this user
+      setUnreadCounts(prev => ({ ...prev, [receiverId]: 0 }));
     } catch (err) {
       setError(err.message);
+      console.error('Error fetching messages:', err);
     } finally {
       setLoading(false);
     }
   };
 
   // Handle incoming new message
-  const handleNewMessage = (message) => {
+  const handleNewMessage = useCallback((message) => {
     setMessages(prev => {
       // Replace temp message if exists
       const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
@@ -167,76 +129,78 @@ const tempMessages = useRef({});
         [message.sender._id]: (prev[message.sender._id] || 0) + 1
       }));
     }
-  };
+  }, [selectedUser]);
 
   // Handle typing indicators
-  const handleTyping = (userId) => {
-    setTypingUsers(prev => [...new Set([...prev, userId])]);
-  };
+  const handleTyping = useCallback((userId) => {
+    setTypingUsers(prev => new Set([...prev, userId]));
+  }, []);
 
-  const handleStopTyping = (userId) => {
-    setTypingUsers(prev => prev.filter(id => id !== userId));
-  };
+  const handleStopTyping = useCallback((userId) => {
+    setTypingUsers(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(userId);
+      return newSet;
+    });
+  }, []);
 
   // Handle message reactions
-  const handleReactionUpdate = (updatedMessage) => {
+  const handleReactionUpdate = useCallback((updatedMessage) => {
     setMessages(prev => 
       prev.map(msg => 
         msg._id === updatedMessage._id ? updatedMessage : msg
       )
     );
-  };
+  }, []);
 
   // Handle edited messages
-  const handleMessageEdited = (editedMessage) => {
+  const handleMessageEdited = useCallback((editedMessage) => {
     setMessages(prev =>
       prev.map(msg =>
         msg._id === editedMessage._id ? editedMessage : msg
       )
     );
-  };
+  }, []);
 
   // Handle deleted messages
-  const handleMessageDeleted = (deletedMessageId) => {
+  const handleMessageDeleted = useCallback((deletedMessageId) => {
     setMessages(prev => prev.filter(msg => msg._id !== deletedMessageId));
-  };
+  }, []);
+
+  // Handle user status changes
+  const handleUserStatusChange = useCallback(({ userId, isOnline }) => {
+    setUsers(prev => prev.map(user => 
+      user._id === userId ? { ...user, isOnline } : user
+    ));
+    
+    setOnlineUsers(prev => {
+      const newSet = new Set(prev);
+      if (isOnline) {
+        newSet.add(userId);
+      } else {
+        newSet.delete(userId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Handle messages read
+  const handleMessagesRead = useCallback(({ readerId }) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.sender._id === readerId ? { ...msg, status: 'read' } : msg
+      )
+    );
+  }, []);
 
   // Select a user to chat with
-  const selectUser = (user) => {
+  const selectUser = useCallback((user) => {
     setSelectedUser(user);
-    setUnreadCounts(prev => ({ ...prev, [user._id]: 0 }));
     fetchMessages(user._id);
-  };
-
-// Add to socket effects:
-useEffect(() => {
-  if (socket) {
-    socket.on('userStatusChanged', ({ userId, isOnline }) => {
-      setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, isOnline } : user
-      ));
-      setOnlineUsers(prev => 
-        isOnline 
-          ? [...prev, userId]
-          : prev.filter(id => id !== userId)
-      );
-    });
-
-    socket.on('updateReactions', (updatedMessage) => {
-      setMessages(prev => prev.map(msg =>
-        msg._id === updatedMessage._id ? updatedMessage : msg
-      ));
-    });
-
-    return () => {
-      socket.off('userStatusChanged');
-      socket.off('updateReactions');
-    };
-  }
-}, [socket]);
+  }, [user?.userId]);
 
   // Typing indicator handler
-  const sendTyping = () => {
+  const sendTyping = useCallback(() => {
     if (socket && selectedUser) {
       socket.emit('typing', selectedUser._id);
       
@@ -250,10 +214,10 @@ useEffect(() => {
         socket.emit('stopTyping', selectedUser._id);
       }, 3000);
     }
-  };
+  }, [socket, selectedUser]);
 
   // Message search functionality
-  const searchMessages = (query) => {
+  const searchMessages = useCallback((query) => {
     setSearchQuery(query);
     if (!query.trim()) {
       setSearchResults([]);
@@ -263,10 +227,10 @@ useEffect(() => {
       msg.content.toLowerCase().includes(query.toLowerCase())
     );
     setSearchResults(results);
-  };
+  }, [messages]);
 
-    // Send a new message
-  const sendMessage = (content) => {
+  // Send a new message
+  const sendMessage = useCallback((content) => {
     if (socket && selectedUser && user && content.trim()) {
       // Create temporary message for immediate UI update
       const tempMessage = {
@@ -300,7 +264,12 @@ useEffect(() => {
         );
       }, 1000);
     }
-  };
+  }, [socket, selectedUser, user]);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   // Context value
   const value = {
@@ -313,11 +282,13 @@ useEffect(() => {
     unreadCounts,
     searchQuery,
     searchResults,
+    onlineUsers,
     fetchUsers,
     selectUser,
     sendMessage,
     sendTyping,
     searchMessages,
+    clearError,
     socket,
     isConnected,
   };
@@ -329,4 +300,10 @@ useEffect(() => {
   );
 };
 
-export const useChat = () => useContext(ChatContext);
+export const useChat = () => {
+  const context = useContext(ChatContext);
+  if (!context) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
+};

@@ -20,6 +20,7 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
+    console.log("------------>login auth.js")
     const { username, password } = req.body;
     const user = await User.findOne({ username });
     if (!user) throw new Error('User not found');

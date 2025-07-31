@@ -1,88 +1,128 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-
-///hadle response
+// Enhanced response handler
 const handleResponse = async (response) => {
-  if (response.status === 401) {
-    // Token expired or invalid
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-    throw new Error('Session expired. Please login again.');
-  }
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Something went wrong');
-  }
-  
-  return response.json();
-};
-
-
-export const loginUser = async (username, password) => {
-  const response = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ username, password })
-  });
-  return handleResponse(response);
-};
-
-export const signupUser = async (username, password) => {
-  const response = await fetch(`${API_URL}/auth/signup`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ username, password })
-  });
-  return handleResponse(response);
-};
-
-// Helper function to get token
-const getToken = () => {
-  const userData = localStorage.getItem('user');
-  if (!userData) return null;
-  
   try {
-    const user = JSON.parse(userData);
-    return user.token;
+    const data = await response.json();
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        throw new Error(data.message || 'Session expired. Please login again.');
+      }
+      throw new Error(data.message || `Request failed with status ${response.status}`);
+    }
+    
+    return data;
   } catch (error) {
-    console.error("Error parsing user data:", error);
-    return null;
+    if (error.name === 'SyntaxError') {
+      throw new Error('Invalid response format from server');
+    }
+    throw error;
   }
 };
 
-// Update all functions to use getToken()
-export const getUsers = async () => {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+// Add request interceptor
+const authFetch = async (url, options = {}) => {
+  const userData = localStorage.getItem('user');
+  const token = userData ? JSON.parse(userData).token : null;
   
-  const response = await fetch(`${API_URL}/chat/users`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+
+  try {
+    const response = await fetch(`${API_URL}${url}`, {
+      ...options,
+      headers
+    });
+    return await handleResponse(response);
+  } catch (error) {
+    console.error('API Error:', error);
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error. Please check your connection.');
     }
-  });
-  return handleResponse(response);
+    throw error;
+  }
 };
 
-export const getMessages = async (receiverId) => {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+// Auth functions
+export const authAPI = {
+  login: async (username, password) => {
+    return authFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+  },
   
-  const response = await fetch(`${API_URL}/chat/messages/${receiverId}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
+  signup: async (username, password) => {
+    return authFetch('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+  },
 
-   const messages = await handleResponse(response);
-  return messages.map(msg => ({
-    ...msg,
-    // Ensure sender is always an object with _id
-    sender: typeof msg.sender === 'string' ? { _id: msg.sender } : msg.sender
-  }));
-  // return handleResponse(response);
+  logout: async () => {
+    return authFetch('/auth/logout', {
+      method: 'POST'
+    });
+  },
+
+  refreshToken: async () => {
+    return authFetch('/auth/refresh-token', {
+      method: 'POST'
+    });
+  }
+};
+
+// Chat functions
+export const chatAPI = {
+  getUsers: async () => {
+    const users = await authFetch('/chat/users');
+    return users.map(user => ({
+      ...user,
+      _id: user._id || user.id,
+      isOnline: user.isOnline || false,
+      lastSeen: user.lastSeen || null
+    }));
+  },
+  
+  getMessages: async (receiverId) => {
+    const messages = await authFetch(`/chat/messages/${receiverId}`);
+    return messages.map(msg => ({
+      ...msg,
+      _id: msg._id || msg.id,
+      sender: typeof msg.sender === 'string' 
+        ? { _id: msg.sender, username: 'Unknown User' } 
+        : { 
+            _id: msg.sender._id || msg.sender.id, 
+            username: msg.sender.username || 'Unknown User',
+            avatar: msg.sender.avatar
+          },
+      receiver: typeof msg.receiver === 'string' 
+        ? { _id: msg.receiver, username: 'Unknown User' } 
+        : { 
+            _id: msg.receiver._id || msg.receiver.id, 
+            username: msg.receiver.username || 'Unknown User',
+            avatar: msg.receiver.avatar
+          }
+    }));
+  },
+
+  searchMessages: async (query) => {
+    return authFetch(`/chat/search?query=${encodeURIComponent(query)}`);
+  },
+
+  deleteConversation: async (receiverId) => {
+    return authFetch(`/chat/conversation/${receiverId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  getUserStatus: async (userId) => {
+    return authFetch(`/chat/user/${userId}/status`);
+  }
 };

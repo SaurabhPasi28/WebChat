@@ -19,7 +19,7 @@ export default function AuthPage() {
       : await register(username, password);
     
     if (result.success) {
-      navigate('/chat');
+      navigate('/');
     } else {
       setError(result.error);
     }

@@ -7,7 +7,7 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const { signup, error } = useAuth();
   const navigate = useNavigate();
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
