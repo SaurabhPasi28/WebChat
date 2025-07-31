@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import ChatList from './ChatList';
 import ChatArea from './ChatArea';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import Header from '../Layout/Header';
 
 export default function ChatContainer() {
   const { selectedUser, users, loading, error, clearError } = useChat();
@@ -30,11 +31,12 @@ export default function ChatContainer() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="h-screen  border-green-600 bg-gray-100">
+      <Header/>
       {/* Header for mobile */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-white border-b border-gray-200 px-4 py-3">
+      <div className="md:hidden  relative top-0 left-0 right-0 z-20 bg-white  border-0  border-red-600 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex  items-center space-x-3">
             <button
               onClick={() => setIsMobileListOpen(!isMobileListOpen)}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -47,7 +49,7 @@ export default function ChatContainer() {
             </button>
             <h1 className="text-lg font-semibold text-gray-900">WebChat</h1>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center  space-x-2">
             <span className="text-sm text-gray-600">Hi, {user?.username}</span>
             <button
               onClick={handleLogout}
@@ -59,18 +61,20 @@ export default function ChatContainer() {
           </div>
         </div>
       </div>
+      
+    <div className="flex relative h-[calc(100vh-4rem)] border-0  border-black  bg-gray-50">
 
       {/* Chat List Sidebar */}
       <div 
         className={`
           ${isMobileListOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} 
-          fixed md:relative inset-y-0 left-0 z-10 w-80 bg-white border-r border-gray-200 
-          transform transition-transform duration-300 ease-in-out md:transform-none
+          fixed md:relative left-0 z-10 w-80 bg-white border-0  border-green-600
+          transform transition-transform duration-300 ease-in-out md:transform-none h-[calc(100vh-4rem)]
         `}
       >
         <div className="flex flex-col h-full">
           {/* Desktop Header */}
-          <div className="hidden md:flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="hidden md:flex items-center justify-between p-4 border-gray-200">
             <h1 className="text-xl font-semibold text-gray-900">Messages</h1>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">Hi, {user?.username}</span>
@@ -92,7 +96,7 @@ export default function ChatContainer() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col md:ml-0">
+      <div className="flex-1 border-0  border-blue-600 flex flex-col md:ml-0">
         {selectedUser ? (
           <ChatArea onBack={() => setIsMobileListOpen(true)} />
         ) : (
@@ -162,6 +166,7 @@ export default function ChatContainer() {
           onClick={() => setIsMobileListOpen(false)}
         />
       )}
+    </div>
     </div>
   );
 }

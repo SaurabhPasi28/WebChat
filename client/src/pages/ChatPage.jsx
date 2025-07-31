@@ -125,7 +125,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen  bg-gray-200">
       {/* Sidebar */}
       <div className="w-1/4 bg-white border-r flex flex-col">
         <div className="p-4 border-b">
