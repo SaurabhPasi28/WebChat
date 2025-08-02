@@ -1,25 +1,90 @@
 # WebChat - Real-time Chat Application
 
-A modern real-time chat application built with React, Node.js, Socket.IO, and MongoDB.
+A modern, real-time chat application built with React, Node.js, Socket.IO, and MongoDB. Features a clean, responsive design with real-time messaging capabilities.
 
 ## Features
 
-- 🔐 User authentication (signup/login)
-- 💬 Real-time messaging
-- 👥 User list with online status
-- 📱 Responsive design
-- 🔄 Message status (sent, delivered, read)
-- 🎨 Modern UI with Tailwind CSS
-- 🔒 JWT authentication
-- 🚀 Socket.IO for real-time communication
+### Core Messaging
+- **Real-time messaging** with instant message delivery
+- **Message status tracking** (sent, delivered, read)
+- **Typing indicators** to show when users are typing
+- **Online/offline status** with last seen timestamps
+- **Message timestamps** with readable time formatting
 
-## Prerequisites
+### User Management
+- **User authentication** with JWT tokens
+- **User profiles** with avatars and status
+- **User search** functionality
+- **Online status tracking** across all connected clients
 
-- Node.js (v16 or higher)
-- MongoDB (running on localhost:27017)
-- npm or yarn
+### Chat Interface
+- **Responsive design** that works on mobile and desktop
+- **Message bubbles** with different styles for sent/received messages
+- **Unread message counts** for each conversation
+- **Message search** within conversations
+- **Auto-scroll** to latest messages
+- **Clean, modern UI** with smooth animations
+
+### Real-time Features
+- **WebSocket connections** for instant updates
+- **Typing indicators** in real-time
+- **Online status updates** across all clients
+- **Message read receipts** with status updates
+- **Connection status** indicators
+
+## Tech Stack
+
+### Frontend
+- **React 18** with modern hooks
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **Socket.IO Client** for real-time communication
+- **Axios** for HTTP requests
+- **Heroicons** for icons
+
+### Backend
+- **Node.js** with Express.js
+- **Socket.IO** for real-time communication
+- **MongoDB** with Mongoose ODM
+- **JWT** for authentication
+- **bcrypt** for password hashing
+
+### Database
+- **MongoDB** for data persistence
+- **Mongoose** for schema management and validation
+
+## Project Structure
+
+```
+WebChat/
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/    # React components
+│   │   │   ├── Auth/     # Authentication components
+│   │   │   ├── Chat/     # Chat interface components
+│   │   │   └── Layout/   # Layout components
+│   │   ├── context/      # React context providers
+│   │   ├── hooks/        # Custom React hooks
+│   │   ├── pages/        # Page components
+│   │   └── services/     # API and socket services
+│   └── public/           # Static assets
+├── server/               # Node.js backend
+│   ├── controllers/      # Route controllers
+│   ├── middleware/       # Express middleware
+│   ├── models/          # Mongoose models
+│   ├── routes/          # API routes
+│   └── utils/           # Utility functions
+└── setup.js             # Database setup script
+```
 
 ## Installation
+
+### Prerequisites
+- Node.js (v16 or higher)
+- MongoDB (local or cloud instance)
+- npm or yarn
+
+### Setup
 
 1. **Clone the repository**
    ```bash
@@ -29,152 +94,99 @@ A modern real-time chat application built with React, Node.js, Socket.IO, and Mo
 
 2. **Install dependencies**
    ```bash
-   # Install root dependencies
-   npm install
-   
    # Install server dependencies
    cd server
    npm install
-   
+
    # Install client dependencies
    cd ../client
    npm install
    ```
 
-3. **Set up environment variables**
+3. **Environment Configuration**
    
-   The setup script will create the necessary environment files:
-   ```bash
-   node setup.js
-   ```
-   
-   Or manually create:
-   
-   **server/.env:**
+   Create `server/config.env`:
    ```env
    PORT=5000
-   NODE_ENV=development
    MONGODB_URI=mongodb://localhost:27017/webchat
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-   JWT_REFRESH_SECRET=your-super-secret-refresh-jwt-key-change-this-in-production
-   CLIENT_URL=http://localhost:5173
-   USE_REDIS=false
-   ```
-   
-   **client/.env:**
-   ```env
-   VITE_API_URL=http://localhost:5000/api
+   JWT_SECRET=your_jwt_secret_here
+   NODE_ENV=development
    ```
 
-4. **Start MongoDB**
-   
-   Make sure MongoDB is running on localhost:27017
-
-## Running the Application
-
-### Development Mode
-
-1. **Start the server**
+4. **Database Setup**
    ```bash
    cd server
-   npm start
+   node setup.js
    ```
-   Server will run on http://localhost:5000
 
-2. **Start the client**
+5. **Start the application**
    ```bash
-   cd client
+   # Start server (from server directory)
+   npm start
+
+   # Start client (from client directory)
    npm run dev
    ```
-   Client will run on http://localhost:5173
-
-### Production Mode
-
-1. **Build the client**
-   ```bash
-   cd client
-   npm run build
-   ```
-
-2. **Start the server**
-   ```bash
-   cd server
-   NODE_ENV=production npm start
-   ```
-
-## Project Structure
-
-```
-WebChat/
-├── client/                 # React frontend
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── context/        # React context providers
-│   │   ├── services/       # API and socket services
-│   │   └── ...
-│   └── ...
-├── server/                 # Node.js backend
-│   ├── controllers/        # Route controllers
-│   ├── models/            # MongoDB models
-│   ├── routes/            # API routes
-│   ├── middleware/        # Express middleware
-│   ├── utils/             # Utility functions
-│   └── ...
-└── ...
-```
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/signup` - User registration
+- `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current user
 
 ### Chat
 - `GET /api/chat/users` - Get all users
 - `GET /api/chat/messages/:receiverId` - Get messages with a user
+- `GET /api/chat/users/status/:userId` - Get user status
 
 ## Socket Events
 
 ### Client to Server
 - `join` - Join user room
-- `sendMessage` - Send a message
-- `typing` - User typing indicator
+- `userOnline` - Mark user as online
+- `userOffline` - Mark user as offline
+- `sendMessage` - Send a new message
+- `typing` - Start typing indicator
 - `stopTyping` - Stop typing indicator
 - `markAsRead` - Mark messages as read
 
 ### Server to Client
 - `receiveMessage` - Receive new message
-- `typing` - User typing notification
+- `messageSent` - Confirm message sent
+- `typing` - User started typing
 - `stopTyping` - User stopped typing
 - `userStatusChanged` - User online/offline status
+- `messagesRead` - Messages marked as read
 
-## Troubleshooting
+## Features Removed
 
-### Common Issues
+The following features have been removed to simplify the application:
 
-1. **MongoDB Connection Error**
-   - Ensure MongoDB is running on localhost:27017
-   - Check if the database name is correct in MONGODB_URI
+- **Message editing** - Users can no longer edit sent messages
+- **Message deletion** - Users can no longer delete messages
+- **Message reactions** - Users can no longer add emoji reactions to messages
+- **Message search** - Server-side message search has been removed (client-side search within conversations remains)
+- **Conversation deletion** - Users can no longer delete entire conversations
+- **Message attachments** - File upload functionality has been removed
+- **Message replies** - Reply-to-message functionality has been removed
 
-2. **Socket Connection Issues**
-   - Verify the server is running on port 5000
-   - Check CORS configuration in server
-   - Ensure client is connecting to the correct socket URL
+## Development
 
-3. **Authentication Issues**
-   - Check JWT_SECRET is set in environment variables
-   - Verify token expiration settings
-   - Clear browser localStorage if needed
+### Running in Development
+```bash
+# Server (from server directory)
+npm run dev
 
-4. **User Registration/Login Issues**
-   - Check if MongoDB is accessible
-   - Verify password requirements (minimum 6 characters)
-   - Check for duplicate usernames
+# Client (from client directory)
+npm run dev
+```
 
-### Debug Mode
-
-To enable debug logging, set `NODE_ENV=development` in your server environment.
+### Building for Production
+```bash
+# Client (from client directory)
+npm run build
+```
 
 ## Contributing
 
@@ -190,8 +202,4 @@ This project is licensed under the MIT License.
 
 ## Support
 
-If you encounter any issues, please:
-1. Check the troubleshooting section
-2. Review the console logs for errors
-3. Ensure all dependencies are installed
-4. Verify environment variables are set correctly 
+For support or questions, please open an issue in the repository. 

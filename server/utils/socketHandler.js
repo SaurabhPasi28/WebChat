@@ -100,19 +100,6 @@ export const configureSocket = (io) => {
       }
     });
 
-    // Message reactions
-    socket.on('messageReaction', async ({ messageId, emoji, userId, receiverId }) => {
-      try {
-        const message = await Message.addReaction(messageId, emoji, userId);
-        if (message) {
-          io.to(receiverId).emit('updateReactions', message);
-          console.log(`😀 Reaction added to message ${messageId}`);
-        }
-      } catch (error) {
-        console.error('Error adding reaction:', error);
-      }
-    });
-
     // Message status updates
     socket.on('messageStatus', async ({ messageId, status, userId }) => {
       try {
@@ -131,45 +118,6 @@ export const configureSocket = (io) => {
         console.log(`📊 Message ${messageId} status updated to ${status}`);
       } catch (error) {
         console.error('Error updating message status:', error);
-      }
-    });
-
-    // Message edits
-    socket.on('editMessage', async ({ messageId, newContent, userId, receiverId }) => {
-      try {
-        const message = await Message.findByIdAndUpdate(
-          messageId,
-          { 
-            content: newContent,
-            'edited.isEdited': true,
-            'edited.editedAt': new Date()
-          },
-          { new: true }
-        ).populate('sender receiver');
-        
-        io.to(receiverId).emit('messageEdited', message);
-        console.log(`✏️ Message ${messageId} edited by ${userId}`);
-      } catch (error) {
-        console.error('Error editing message:', error);
-      }
-    });
-
-    // Message deletion
-    socket.on('deleteMessage', async ({ messageId, userId, receiverId }) => {
-      try {
-        await Message.findByIdAndUpdate(
-          messageId,
-          {
-            'deleted.isDeleted': true,
-            'deleted.deletedAt': new Date(),
-            'deleted.deletedBy': userId
-          }
-        );
-        
-        io.to(receiverId).emit('messageDeleted', messageId);
-        console.log(`🗑️ Message ${messageId} deleted by ${userId}`);
-      } catch (error) {
-        console.error('Error deleting message:', error);
       }
     });
 

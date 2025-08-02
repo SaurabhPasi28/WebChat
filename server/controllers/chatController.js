@@ -159,62 +159,6 @@ export const getChatUsers = async (req, res, next) => {
   }
 };
 
-// Additional Controller Methods
-
-export const searchMessages = async (req, res, next) => {
-  try {
-    const { userId } = req.user;
-    const { query } = req.query;
-
-    if (!query || query.length < 3) {
-      throw createError(400, 'Search query must be at least 3 characters');
-    }
-
-    const messages = await Message.find({
-      $or: [
-        { sender: userId },
-        { receiver: userId }
-      ],
-      content: { $regex: query, $options: 'i' }
-    })
-      .populate('sender receiver', 'username avatar')
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    res.json(messages);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const deleteConversation = async (req, res, next) => {
-  try {
-    const { userId } = req.user;
-    const { receiverId } = req.params;
-
-    // Soft delete for both participants
-    await Message.updateMany(
-      {
-        $or: [
-          { sender: userId, receiver: receiverId },
-          { sender: receiverId, receiver: userId }
-        ]
-      },
-      {
-        $set: {
-          'deleted.isDeleted': true,
-          'deleted.deletedAt': new Date(),
-          'deleted.deletedBy': userId
-        }
-      }
-    );
-
-    res.json({ success: true });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const getUserStatus = async (req, res, next) => {
   try {
     const { userId } = req.params;

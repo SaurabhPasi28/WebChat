@@ -40,9 +40,6 @@ export const ChatProvider = ({ children }) => {
         socket.off('receiveMessage');
         socket.off('typing');
         socket.off('stopTyping');
-        socket.off('updateReactions');
-        socket.off('messageEdited');
-        socket.off('messageDeleted');
         socket.off('userStatusChanged');
         socket.off('messagesRead');
       }
@@ -60,11 +57,6 @@ export const ChatProvider = ({ children }) => {
     // Typing indicators
     socket.on('typing', handleTyping);
     socket.on('stopTyping', handleStopTyping);
-    
-    // Message updates
-    socket.on('updateReactions', handleReactionUpdate);
-    socket.on('messageEdited', handleMessageEdited);
-    socket.on('messageDeleted', handleMessageDeleted);
     
     // User status changes
     socket.on('userStatusChanged', handleUserStatusChange);
@@ -133,38 +125,17 @@ export const ChatProvider = ({ children }) => {
 
   // Handle typing indicators
   const handleTyping = useCallback((userId) => {
+    console.log('User typing:', userId);
     setTypingUsers(prev => new Set([...prev, userId]));
   }, []);
 
   const handleStopTyping = useCallback((userId) => {
+    console.log('User stopped typing:', userId);
     setTypingUsers(prev => {
       const newSet = new Set(prev);
       newSet.delete(userId);
       return newSet;
     });
-  }, []);
-
-  // Handle message reactions
-  const handleReactionUpdate = useCallback((updatedMessage) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg._id === updatedMessage._id ? updatedMessage : msg
-      )
-    );
-  }, []);
-
-  // Handle edited messages
-  const handleMessageEdited = useCallback((editedMessage) => {
-    setMessages(prev =>
-      prev.map(msg =>
-        msg._id === editedMessage._id ? editedMessage : msg
-      )
-    );
-  }, []);
-
-  // Handle deleted messages
-  const handleMessageDeleted = useCallback((deletedMessageId) => {
-    setMessages(prev => prev.filter(msg => msg._id !== deletedMessageId));
   }, []);
 
   // Handle user status changes
@@ -201,7 +172,8 @@ export const ChatProvider = ({ children }) => {
 
   // Typing indicator handler
   const sendTyping = useCallback(() => {
-    if (socket && selectedUser) {
+    if (socket && selectedUser && isConnected) {
+      console.log('Sending typing indicator to:', selectedUser._id);
       socket.emit('typing', selectedUser._id);
       
       // Clear previous timeout
@@ -211,10 +183,11 @@ export const ChatProvider = ({ children }) => {
       
       // Set new timeout
       typingTimeout.current = setTimeout(() => {
+        console.log('Stopping typing indicator for:', selectedUser._id);
         socket.emit('stopTyping', selectedUser._id);
       }, 3000);
     }
-  }, [socket, selectedUser]);
+  }, [socket, selectedUser, isConnected]);
 
   // Message search functionality
   const searchMessages = useCallback((query) => {
