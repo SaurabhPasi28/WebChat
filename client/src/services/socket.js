@@ -13,9 +13,12 @@ export const useSocket = () => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
       if (!user?.userId) {
+        console.log('No user found in localStorage, cannot connect socket');
         setConnectionError('No user found');
         return null;
       }
+
+      console.log('Connecting socket for user:', user.userId);
 
       const socketInstance = io(SOCKET_URL, {
         auth: { userId: user.userId },
@@ -31,12 +34,13 @@ export const useSocket = () => {
       // Connection events
       socketInstance.on('connect', () => {
         setConnectionStatus('connected');
-        console.log('🔌 Socket connected successfully');
+        console.log('🔌 Socket connected successfully for user:', user.userId);
         setIsConnected(true);
         setConnectionError(null);
         
         // Join user's room
         socketInstance.emit('join', user.userId);
+        socketInstance.emit('userOnline', user.userId);
       });
 
       socketInstance.on('disconnect', (reason) => {
@@ -67,6 +71,7 @@ export const useSocket = () => {
         
         // Re-join user's room after reconnection
         socketInstance.emit('join', user.userId);
+        socketInstance.emit('userOnline', user.userId);
       });
 
       socketInstance.on('reconnecting', (attemptNumber) => {
@@ -87,14 +92,18 @@ export const useSocket = () => {
     
     const user = JSON.parse(localStorage.getItem('user'));
     if (user?.userId) {
+      console.log('Initializing socket connection for user:', user.userId);
       socketInstance = connectSocket();
       if (socketInstance) {
         setSocket(socketInstance);
       }
+    } else {
+      console.log('No user found, skipping socket connection');
     }
 
     return () => {
       if (socketInstance) {
+        console.log('Cleaning up socket connection');
         socketInstance.off('connect');
         socketInstance.off('disconnect');
         socketInstance.off('connect_error');
@@ -107,6 +116,7 @@ export const useSocket = () => {
   }, [connectSocket]);
 
   const retryConnection = useCallback(() => {
+    console.log('Retrying socket connection...');
     if (socket) {
       socket.connect();
     } else {
@@ -118,6 +128,7 @@ export const useSocket = () => {
   }, [socket, connectSocket]);
 
   const disconnect = useCallback(() => {
+    console.log('Disconnecting socket...');
     if (socket) {
       socket.disconnect();
       setSocket(null);

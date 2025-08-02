@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { formatDistanceToNow } from 'date-fns';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export default function ChatList({ onSelectUser }) {
   const { 
@@ -17,21 +17,27 @@ export default function ChatList({ onSelectUser }) {
   } = useChat();
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleSelect = (user) => {
     selectUser(user);
     if (onSelectUser) onSelectUser();
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchUsers();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const filteredUsers = users.filter(user =>
     user.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleRefresh = () => {
-    fetchUsers();
-  };
-
-  if (loading) {
+  if (loading && users.length === 0) {
     return (
       <div className="p-4 space-y-4">
         {[...Array(8)].map((_, i) => (
@@ -47,7 +53,7 @@ export default function ChatList({ onSelectUser }) {
     );
   }
 
-  if (error) {
+  if (error && users.length === 0) {
     return (
       <div className="p-4 text-center">
         <div className="text-red-500 dark:text-red-400 text-sm mb-3">
@@ -55,9 +61,10 @@ export default function ChatList({ onSelectUser }) {
         </div>
         <button 
           onClick={handleRefresh}
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
+          disabled={refreshing}
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm disabled:opacity-50"
         >
-          Try again
+          {refreshing ? 'Refreshing...' : 'Try again'}
         </button>
       </div>
     );
@@ -101,12 +108,22 @@ export default function ChatList({ onSelectUser }) {
             <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text mb-1">
               {searchQuery ? 'No users found' : 'No contacts yet'}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-dark-textSecondary">
+            <p className="text-sm text-gray-500 dark:text-dark-textSecondary mb-4">
               {searchQuery 
                 ? 'Try adjusting your search terms' 
                 : 'Create an account to start chatting'
               }
             </p>
+            {!searchQuery && (
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm disabled:opacity-50"
+              >
+                <ArrowPathIcon className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <span>{refreshing ? 'Refreshing...' : 'Refresh Users'}</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-dark-border">
@@ -181,9 +198,11 @@ export default function ChatList({ onSelectUser }) {
             </span>
             <button
               onClick={handleRefresh}
-              className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
+              disabled={refreshing}
+              className="flex items-center space-x-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium disabled:opacity-50"
             >
-              Refresh
+              <ArrowPathIcon className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
         </div>

@@ -25,13 +25,38 @@ export const ChatProvider = ({ children }) => {
   const typingTimeout = useRef(null);
   const messageStatusTimeout = useRef(null);
 
+  // Fetch all users except current user
+  const fetchUsers = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await chatAPI.getUsers();
+      setUsers(data);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
   // Initialize chat when user is authenticated
   useEffect(() => {
-    if (user && socket && isConnected) {
+    if (user) {
+      console.log('User authenticated, fetching users...');
       fetchUsers();
+    }
+  }, [user, fetchUsers]);
+
+  // Setup socket listeners when socket is connected
+  useEffect(() => {
+    if (socket && isConnected && user) {
+      console.log('Socket connected, setting up listeners...');
       setupSocketListeners();
     }
-  }, [user, socket, isConnected]);
+  }, [socket, isConnected, user]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -64,21 +89,6 @@ export const ChatProvider = ({ children }) => {
     // Message read receipts
     socket.on('messagesRead', handleMessagesRead);
   }, [socket]);
-
-  // Fetch all users except current user
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await chatAPI.getUsers();
-      setUsers(data);
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Fetch messages for selected user
   const fetchMessages = async (receiverId) => {
