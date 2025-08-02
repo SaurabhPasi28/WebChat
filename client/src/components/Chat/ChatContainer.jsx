@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import ChatList from './ChatList';
 import ChatArea from './ChatArea';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import Header from '../Layout/Header';
 
 export default function ChatContainer() {
   const { selectedUser, users, loading, error, clearError } = useChat();
@@ -12,11 +13,11 @@ export default function ChatContainer() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Auto-hide sidebar on mobile when user is selected
-  useEffect(() => {
-    if (selectedUser && window.innerWidth < 768) {
-      setIsMobileListOpen(false);
-    }
-  }, [selectedUser]);
+  // useEffect(() => {
+  //   if (selectedUser && window.innerWidth < 768) {
+  //     setIsMobileListOpen(false);
+  //   }
+  // }, [selectedUser]);
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -31,8 +32,9 @@ export default function ChatContainer() {
 
   return (
     <div className="h-auto bg-gray-50 dark:bg-dark-bg">
+      <Header isMobileListOpen={isMobileListOpen} setIsMobileListOpen={setIsMobileListOpen} />
       {/* Header for mobile */}
-      <div className="md:hidden relative h-[4rem] top-0 left-0 right-0 z-20 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border px-4 py-2">
+      {/* <div className="md:hidden relative h-[4rem] top-0 left-0 right-0 z-20 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button
@@ -58,9 +60,9 @@ export default function ChatContainer() {
             </button>
           </div>
         </div>
-      </div>
+      </div> */}
       
-      <div className="flex relative md:h-[calc(100vh-4rem)] h-[calc(100vh-8rem)] bg-gray-50 dark:bg-dark-bg">
+      <div className="flex relative h-[calc(100vh-4rem)] bg-gray-50 dark:bg-dark-bg">
 
         {/* Chat List Sidebar */}
         <div 

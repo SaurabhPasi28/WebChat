@@ -9,8 +9,9 @@ import {
   SignalIcon,
   SignalSlashIcon
 } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
-export default function Header() {
+export default function Header({ isMobileListOpen, setIsMobileListOpen }) {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const { isConnected } = useChat();
@@ -20,10 +21,20 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border shadow-sm">
+    <header className="bg-white h-[4rem] dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand */}
+           <button
+              onClick={() => setIsMobileListOpen(!isMobileListOpen)}
+              className="p-2 md:hidden rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border transition-colors"
+            >
+              {isMobileListOpen ? (
+                <XMarkIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              ) : (
+                <Bars3Icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              )}
+            </button>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
