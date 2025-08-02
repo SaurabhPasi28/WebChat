@@ -7,7 +7,7 @@ const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
   const { user } = useAuth();
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected, connect } = useSocket();
   
   // State declarations
   const [users, setUsers] = useState([]);
@@ -42,82 +42,9 @@ export const ChatProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Initialize chat when user is authenticated
-  useEffect(() => {
-    if (user) {
-      console.log('User authenticated, fetching users...');
-      fetchUsers();
-    }
-  }, [user, fetchUsers]);
-
-  // Setup socket listeners when socket is connected
-  useEffect(() => {
-    if (socket && isConnected && user) {
-      console.log('Socket connected, setting up listeners...');
-      setupSocketListeners();
-    }
-  }, [socket, isConnected, user]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (socket) {
-        socket.off('receiveMessage');
-        socket.off('typing');
-        socket.off('stopTyping');
-        socket.off('userStatusChanged');
-        socket.off('messagesRead');
-      }
-      clearTimeout(typingTimeout.current);
-      clearTimeout(messageStatusTimeout.current);
-    };
-  }, [socket]);
-
-  const setupSocketListeners = useCallback(() => {
-    if (!socket) return;
-    
-    // Message handling
-    socket.on('receiveMessage', handleNewMessage);
-    
-    // Typing indicators
-    socket.on('typing', handleTyping);
-    socket.on('stopTyping', handleStopTyping);
-    
-    // User status changes
-    socket.on('userStatusChanged', handleUserStatusChange);
-    
-    // Message read receipts
-    socket.on('messagesRead', handleMessagesRead);
-  }, [socket]);
-
-  // Fetch messages for selected user
-  const fetchMessages = async (receiverId) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await chatAPI.getMessages(receiverId);
-      setMessages(data);
-      
-      // Mark messages as read
-      if (data.length > 0 && socket) {
-        socket.emit('markAsRead', {
-          senderId: receiverId,
-          receiverId: user.userId
-        });
-      }
-      
-      // Clear unread count for this user
-      setUnreadCounts(prev => ({ ...prev, [receiverId]: 0 }));
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching messages:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle incoming new message
   const handleNewMessage = useCallback((message) => {
+    console.log('Received new message:', message);
     setMessages(prev => {
       // Replace temp message if exists
       const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
@@ -150,6 +77,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle user status changes
   const handleUserStatusChange = useCallback(({ userId, isOnline }) => {
+    console.log('User status changed:', userId, isOnline);
     setUsers(prev => prev.map(user => 
       user._id === userId ? { ...user, isOnline } : user
     ));
@@ -167,6 +95,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle messages read
   const handleMessagesRead = useCallback(({ readerId }) => {
+    console.log('Messages read by:', readerId);
     setMessages(prev => 
       prev.map(msg => 
         msg.sender._id === readerId ? { ...msg, status: 'read' } : msg
@@ -174,8 +103,100 @@ export const ChatProvider = ({ children }) => {
     );
   }, []);
 
+  // Setup socket listeners
+  const setupSocketListeners = useCallback(() => {
+    if (!socket) {
+      console.log('No socket available for setting up listeners');
+      return;
+    }
+    
+    console.log('Setting up socket listeners...');
+    
+    // Remove existing listeners to prevent duplicates
+    socket.off('receiveMessage');
+    socket.off('typing');
+    socket.off('stopTyping');
+    socket.off('userStatusChanged');
+    socket.off('messagesRead');
+    
+    // Message handling
+    socket.on('receiveMessage', handleNewMessage);
+    
+    // Typing indicators
+    socket.on('typing', handleTyping);
+    socket.on('stopTyping', handleStopTyping);
+    
+    // User status changes
+    socket.on('userStatusChanged', handleUserStatusChange);
+    
+    // Message read receipts
+    socket.on('messagesRead', handleMessagesRead);
+    
+    console.log('Socket listeners set up successfully');
+  }, [socket, handleNewMessage, handleTyping, handleStopTyping, handleUserStatusChange, handleMessagesRead]);
+
+  // Initialize chat when user is authenticated
+  useEffect(() => {
+    if (user) {
+      console.log('User authenticated, fetching users...');
+      fetchUsers();
+    }
+  }, [user, fetchUsers]);
+
+  // Setup socket listeners when socket is connected
+  useEffect(() => {
+    if (socket && isConnected && user) {
+      console.log('Socket connected, setting up listeners...');
+      setupSocketListeners();
+    }
+  }, [socket, isConnected, user, setupSocketListeners]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (socket) {
+        console.log('Cleaning up socket listeners...');
+        socket.off('receiveMessage');
+        socket.off('typing');
+        socket.off('stopTyping');
+        socket.off('userStatusChanged');
+        socket.off('messagesRead');
+      }
+      clearTimeout(typingTimeout.current);
+      clearTimeout(messageStatusTimeout.current);
+    };
+  }, [socket]);
+
+  // Fetch messages for selected user
+  const fetchMessages = async (receiverId) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await chatAPI.getMessages(receiverId);
+      setMessages(data);
+      
+      // Mark messages as read
+      if (data.length > 0 && socket && isConnected) {
+        console.log('Marking messages as read for:', receiverId);
+        socket.emit('markAsRead', {
+          senderId: receiverId,
+          receiverId: user.userId
+        });
+      }
+      
+      // Clear unread count for this user
+      setUnreadCounts(prev => ({ ...prev, [receiverId]: 0 }));
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching messages:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Select a user to chat with
   const selectUser = useCallback((user) => {
+    console.log('Selecting user:', user.username);
     setSelectedUser(user);
     fetchMessages(user._id);
   }, [user?.userId]);
@@ -196,6 +217,8 @@ export const ChatProvider = ({ children }) => {
         console.log('Stopping typing indicator for:', selectedUser._id);
         socket.emit('stopTyping', selectedUser._id);
       }, 3000);
+    } else {
+      console.log('Cannot send typing indicator - socket:', !!socket, 'selectedUser:', !!selectedUser, 'isConnected:', isConnected);
     }
   }, [socket, selectedUser, isConnected]);
 
@@ -214,7 +237,12 @@ export const ChatProvider = ({ children }) => {
 
   // Send a new message
   const sendMessage = useCallback((content) => {
-    if (socket && selectedUser && user && content.trim()) {
+    console.log('Attempting to send message:', content);
+    console.log('Socket available:', !!socket, 'Selected user:', !!selectedUser, 'User:', !!user, 'Connected:', isConnected);
+    
+    if (socket && selectedUser && user && content.trim() && isConnected) {
+      console.log('Sending message via socket...');
+      
       // Create temporary message for immediate UI update
       const tempMessage = {
         _id: Date.now().toString(),
@@ -246,8 +274,21 @@ export const ChatProvider = ({ children }) => {
           )
         );
       }, 1000);
+    } else {
+      console.error('Cannot send message - missing requirements');
+      console.error('Socket:', !!socket);
+      console.error('Selected user:', !!selectedUser);
+      console.error('User:', !!user);
+      console.error('Content:', !!content);
+      console.error('Connected:', isConnected);
+      
+      // Try to reconnect if not connected
+      if (!isConnected && user?.userId) {
+        console.log('Attempting to reconnect socket...');
+        connect(user.userId);
+      }
     }
-  }, [socket, selectedUser, user]);
+  }, [socket, selectedUser, user, isConnected, connect]);
 
   // Clear error
   const clearError = useCallback(() => {

@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   // const navigate = useNavigate();
   
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected, connect } = useSocket();
 
   // Initialize auth state from storage
   useEffect(() => {
@@ -89,6 +89,10 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
+      // Connect socket after successful login
+      console.log('Login successful, connecting socket for user:', userData.userId);
+      connect(userData.userId);
+      
       // Navigate to chat
       // navigate('/');
       
@@ -119,6 +123,10 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
+      // Connect socket after successful signup
+      console.log('Signup successful, connecting socket for user:', userData.userId);
+      connect(userData.userId);
+      
       // Navigate to chat
       // navigate('/');
       
@@ -133,41 +141,37 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = useCallback(() => {
-    try {
-      // Emit offline status before disconnecting
-      if (socket && user?.userId) {
-        socket.emit('userOffline', user.userId);
-      }
-    } catch (err) {
-      console.error('Error during logout:', err);
-    } finally {
-      // Remove user data
-      localStorage.removeItem('user');
-      setUser(null);
-      setError(null);
-      
-      // Navigate to login
-      // navigate('/login');
-    }
-  }, [socket, user?.userId]);
+    console.log('Logging out user...');
+    
+    // Clear user data
+    localStorage.removeItem('user');
+    setUser(null);
+    setError(null);
+    
+    // Navigate to login
+    // navigate('/login');
+    
+    // Reload the page to reset all state
+    window.location.href = '/login';
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
+  const value = {
+    user,
+    loading,
+    error,
+    login,
+    signup,
+    logout,
+    clearError,
+    isAuthenticated: !!user
+  };
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        loading, 
-        error, 
-        isAuthenticated: !!user,
-        login, 
-        signup, 
-        logout,
-        clearError
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

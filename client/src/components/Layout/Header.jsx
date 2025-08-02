@@ -1,15 +1,19 @@
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useChat } from '../../context/ChatContext';
 import { 
   SunIcon, 
   MoonIcon, 
   UserCircleIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  SignalIcon,
+  SignalSlashIcon
 } from '@heroicons/react/24/outline';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { isConnected } = useChat();
 
   const handleLogout = () => {
     logout();
@@ -30,6 +34,18 @@ export default function Header() {
 
           {/* Right side - User info and actions */}
           <div className="flex items-center space-x-4">
+            {/* Connection Status */}
+            <div className="flex items-center space-x-1">
+              {isConnected ? (
+                <SignalIcon className="h-4 w-4 text-green-500" title="Connected" />
+              ) : (
+                <SignalSlashIcon className="h-4 w-4 text-red-500" title="Disconnected" />
+              )}
+              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+                {isConnected ? 'Connected' : 'Connecting...'}
+              </span>
+            </div>
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -54,7 +70,7 @@ export default function Header() {
                     {user?.username}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-dark-textSecondary">
-                    Online
+                    {isConnected ? 'Online' : 'Connecting...'}
                   </p>
                 </div>
               </div>
