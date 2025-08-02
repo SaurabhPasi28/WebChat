@@ -40,10 +40,10 @@ export default function ChatArea({ onBack }) {
       {/* Header */}
       <div className="flex-shrink-0 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border">
         {/* Mobile Header */}
-        <div className="md:hidden flex items-center p-3">
+        <div className="md:hidden  flex items-center w-full">
           <button 
             onClick={onBack}
-            className="mr-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border transition-colors"
+            className="mr-3 pl-8 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border transition-colors"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>

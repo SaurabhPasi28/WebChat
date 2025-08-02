@@ -21,9 +21,10 @@ export const ChatProvider = ({ children }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   
-  // Refs for timeouts
+  // Refs for timeouts and connection tracking
   const typingTimeout = useRef(null);
   const messageStatusTimeout = useRef(null);
+  const connectedUserRef = useRef(null);
 
   // Fetch all users except current user
   const fetchUsers = useCallback(async () => {
@@ -44,7 +45,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle incoming new message
   const handleNewMessage = useCallback((message) => {
-    console.log('Received new message:', message);
+    console.log('📨 Received new message:', message);
     setMessages(prev => {
       // Replace temp message if exists
       const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
@@ -62,12 +63,12 @@ export const ChatProvider = ({ children }) => {
 
   // Handle typing indicators
   const handleTyping = useCallback((userId) => {
-    console.log('User typing:', userId);
+    console.log('⌨️ User typing:', userId);
     setTypingUsers(prev => new Set([...prev, userId]));
   }, []);
 
   const handleStopTyping = useCallback((userId) => {
-    console.log('User stopped typing:', userId);
+    console.log('⌨️ User stopped typing:', userId);
     setTypingUsers(prev => {
       const newSet = new Set(prev);
       newSet.delete(userId);
@@ -77,7 +78,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle user status changes
   const handleUserStatusChange = useCallback(({ userId, isOnline }) => {
-    console.log('User status changed:', userId, isOnline);
+    console.log('👤 User status changed:', userId, isOnline);
     setUsers(prev => prev.map(user => 
       user._id === userId ? { ...user, isOnline } : user
     ));
@@ -95,7 +96,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle messages read
   const handleMessagesRead = useCallback(({ readerId }) => {
-    console.log('Messages read by:', readerId);
+    console.log('📖 Messages read by:', readerId);
     setMessages(prev => 
       prev.map(msg => 
         msg.sender._id === readerId ? { ...msg, status: 'read' } : msg
@@ -106,11 +107,11 @@ export const ChatProvider = ({ children }) => {
   // Setup socket listeners
   const setupSocketListeners = useCallback(() => {
     if (!socket) {
-      console.log('No socket available for setting up listeners');
+      console.log('❌ No socket available for setting up listeners');
       return;
     }
     
-    console.log('Setting up socket listeners...');
+    console.log('🔧 Setting up socket listeners...');
     
     // Remove existing listeners to prevent duplicates
     socket.off('receiveMessage');
@@ -132,21 +133,30 @@ export const ChatProvider = ({ children }) => {
     // Message read receipts
     socket.on('messagesRead', handleMessagesRead);
     
-    console.log('Socket listeners set up successfully');
+    console.log('✅ Socket listeners set up successfully');
   }, [socket, handleNewMessage, handleTyping, handleStopTyping, handleUserStatusChange, handleMessagesRead]);
 
   // Initialize chat when user is authenticated
   useEffect(() => {
     if (user) {
-      console.log('User authenticated, fetching users...');
+      console.log('👤 User authenticated, fetching users...');
       fetchUsers();
     }
   }, [user, fetchUsers]);
 
+  // Connect socket when user is authenticated (only once per user)
+  useEffect(() => {
+    if (user?.userId && connectedUserRef.current !== user.userId) {
+      console.log('🔌 User authenticated, connecting socket for:', user.userId);
+      connectedUserRef.current = user.userId;
+      connect(user.userId);
+    }
+  }, [user?.userId, connect]);
+
   // Setup socket listeners when socket is connected
   useEffect(() => {
     if (socket && isConnected && user) {
-      console.log('Socket connected, setting up listeners...');
+      console.log('🔧 Socket connected, setting up listeners...');
       setupSocketListeners();
     }
   }, [socket, isConnected, user, setupSocketListeners]);
@@ -155,7 +165,7 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     return () => {
       if (socket) {
-        console.log('Cleaning up socket listeners...');
+        console.log('🧹 Cleaning up socket listeners...');
         socket.off('receiveMessage');
         socket.off('typing');
         socket.off('stopTyping');
@@ -177,7 +187,7 @@ export const ChatProvider = ({ children }) => {
       
       // Mark messages as read
       if (data.length > 0 && socket && isConnected) {
-        console.log('Marking messages as read for:', receiverId);
+        console.log('📖 Marking messages as read for:', receiverId);
         socket.emit('markAsRead', {
           senderId: receiverId,
           receiverId: user.userId
@@ -196,7 +206,7 @@ export const ChatProvider = ({ children }) => {
 
   // Select a user to chat with
   const selectUser = useCallback((user) => {
-    console.log('Selecting user:', user.username);
+    console.log('👤 Selecting user:', user.username);
     setSelectedUser(user);
     fetchMessages(user._id);
   }, [user?.userId]);
@@ -204,7 +214,7 @@ export const ChatProvider = ({ children }) => {
   // Typing indicator handler
   const sendTyping = useCallback(() => {
     if (socket && selectedUser && isConnected) {
-      console.log('Sending typing indicator to:', selectedUser._id);
+      console.log('⌨️ Sending typing indicator to:', selectedUser._id);
       socket.emit('typing', selectedUser._id);
       
       // Clear previous timeout
@@ -214,11 +224,11 @@ export const ChatProvider = ({ children }) => {
       
       // Set new timeout
       typingTimeout.current = setTimeout(() => {
-        console.log('Stopping typing indicator for:', selectedUser._id);
+        console.log('⌨️ Stopping typing indicator for:', selectedUser._id);
         socket.emit('stopTyping', selectedUser._id);
       }, 3000);
     } else {
-      console.log('Cannot send typing indicator - socket:', !!socket, 'selectedUser:', !!selectedUser, 'isConnected:', isConnected);
+      console.log('❌ Cannot send typing indicator - socket:', !!socket, 'selectedUser:', !!selectedUser, 'isConnected:', isConnected);
     }
   }, [socket, selectedUser, isConnected]);
 
@@ -237,11 +247,11 @@ export const ChatProvider = ({ children }) => {
 
   // Send a new message
   const sendMessage = useCallback((content) => {
-    console.log('Attempting to send message:', content);
-    console.log('Socket available:', !!socket, 'Selected user:', !!selectedUser, 'User:', !!user, 'Connected:', isConnected);
+    console.log('📤 Attempting to send message:', content);
+    console.log('🔌 Socket available:', !!socket, 'Selected user:', !!selectedUser, 'User:', !!user, 'Connected:', isConnected);
     
     if (socket && selectedUser && user && content.trim() && isConnected) {
-      console.log('Sending message via socket...');
+      console.log('📤 Sending message via socket...');
       
       // Create temporary message for immediate UI update
       const tempMessage = {
@@ -275,7 +285,7 @@ export const ChatProvider = ({ children }) => {
         );
       }, 1000);
     } else {
-      console.error('Cannot send message - missing requirements');
+      console.error('❌ Cannot send message - missing requirements');
       console.error('Socket:', !!socket);
       console.error('Selected user:', !!selectedUser);
       console.error('User:', !!user);
@@ -284,7 +294,7 @@ export const ChatProvider = ({ children }) => {
       
       // Try to reconnect if not connected
       if (!isConnected && user?.userId) {
-        console.log('Attempting to reconnect socket...');
+        console.log('🔄 Attempting to reconnect socket...');
         connect(user.userId);
       }
     }

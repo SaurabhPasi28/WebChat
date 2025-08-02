@@ -10,6 +10,19 @@ export const configureSocket = (io) => {
   io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
     
+    // Get userId from auth or handshake
+    const userId = socket.handshake.auth?.userId;
+    
+    if (!userId) {
+      console.log('❌ Socket connection rejected: No userId provided');
+      socket.disconnect();
+      return;
+    }
+
+    // Attach user info to socket
+    socket.userId = userId;
+    console.log('✅ Socket connected for user:', userId);
+    
     // Join a room based on user ID
     socket.on('join', (userId) => {
       socket.join(userId);
@@ -100,47 +113,21 @@ export const configureSocket = (io) => {
       }
     });
 
-    // Message status updates
-    socket.on('messageStatus', async ({ messageId, status, userId }) => {
-      try {
-        const message = await Message.findByIdAndUpdate(
-          messageId,
-          { status },
-          { new: true }
-        ).populate('sender receiver');
-        
-        if (status === 'read') {
-          io.to(userId).emit('messageRead', message);
-        } else {
-          io.to(message.receiver._id).emit('messageStatusUpdate', message);
-        }
-        
-        console.log(`📊 Message ${messageId} status updated to ${status}`);
-      } catch (error) {
-        console.error('Error updating message status:', error);
-      }
-    });
-
-    // Disconnect handling
+    // Handle disconnection
     socket.on('disconnect', async () => {
-      console.log('🔌 Client disconnected:', socket.id);
+      console.log('🔌 Client disconnected:', socket.id, 'for user:', socket.userId);
       
-      // Find user by socket ID and mark as offline
-      try {
-        const user = await User.findOneAndUpdate(
-          { socketId: socket.id },
-          { 
+      if (socket.userId) {
+        try {
+          await User.findByIdAndUpdate(socket.userId, { 
             isOnline: false,
             lastSeen: new Date()
-          }
-        );
-        
-        if (user) {
-          io.emit('userStatusChanged', { userId: user._id, isOnline: false });
-          console.log(`🔴 User ${user._id} disconnected`);
+          });
+          io.emit('userStatusChanged', { userId: socket.userId, isOnline: false });
+          console.log(`🔴 User ${socket.userId} went offline due to disconnect`);
+        } catch (error) {
+          console.error('Error updating user offline status on disconnect:', error);
         }
-      } catch (error) {
-        console.error('Error handling disconnect:', error);
       }
     });
   });

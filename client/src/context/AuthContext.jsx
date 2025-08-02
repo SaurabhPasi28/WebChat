@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 // import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api.js';
-import { useSocket } from '../services/socket.js';
 
 const AuthContext = createContext();
 
@@ -10,8 +9,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   // const navigate = useNavigate();
-  
-  const { socket, isConnected, connect } = useSocket();
 
   // Initialize auth state from storage
   useEffect(() => {
@@ -50,15 +47,6 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Handle socket connection when user is authenticated
-  useEffect(() => {
-    if (user && socket && isConnected) {
-      // Join user's room and set online status
-      socket.emit('join', user.userId);
-      socket.emit('userOnline', user.userId);
-    }
-  }, [user, socket, isConnected]);
-
   const validateToken = async (token) => {
     try {
       // You can add a token validation endpoint here
@@ -89,10 +77,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
-      // Connect socket after successful login
-      console.log('Login successful, connecting socket for user:', userData.userId);
-      connect(userData.userId);
-      
       // Navigate to chat
       // navigate('/');
       
@@ -122,10 +106,6 @@ export const AuthProvider = ({ children }) => {
       
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
-      
-      // Connect socket after successful signup
-      console.log('Signup successful, connecting socket for user:', userData.userId);
-      connect(userData.userId);
       
       // Navigate to chat
       // navigate('/');

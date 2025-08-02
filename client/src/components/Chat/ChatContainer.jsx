@@ -30,9 +30,9 @@ export default function ChatContainer() {
   };
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-dark-bg">
+    <div className="h-auto bg-gray-50 dark:bg-dark-bg">
       {/* Header for mobile */}
-      <div className="md:hidden relative top-0 left-0 right-0 z-20 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border px-4 py-3">
+      <div className="md:hidden relative h-[4rem] top-0 left-0 right-0 z-20 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button
@@ -60,7 +60,7 @@ export default function ChatContainer() {
         </div>
       </div>
       
-      <div className="flex relative h-[calc(100vh-4rem)] bg-gray-50 dark:bg-dark-bg">
+      <div className="flex relative md:h-[calc(100vh-4rem)] h-[calc(100vh-8rem)] bg-gray-50 dark:bg-dark-bg">
 
         {/* Chat List Sidebar */}
         <div 
