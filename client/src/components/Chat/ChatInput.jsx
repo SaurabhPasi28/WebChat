@@ -159,10 +159,10 @@ export default function ChatInput() {
           {/* Send Button */}
           <button
             type="submit"
-            disabled={!message.trim() || !isConnected}
+            disabled={!message.trim() }
             className={`
               p-3 rounded-lg transition-all duration-200 flex items-center justify-center
-              ${message.trim() && isConnected
+              ${message.trim()
                 ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-md hover:shadow-lg transform hover:scale-105' 
                 : 'bg-gray-100 dark:bg-dark-border text-gray-400 dark:text-gray-500 cursor-not-allowed'
               }
