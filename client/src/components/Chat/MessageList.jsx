@@ -86,7 +86,7 @@ export default function MessageList() {
               nextMessage.sender._id !== message.sender._id ||
               new Date(message.createdAt) - new Date(nextMessage.createdAt) > 5 * 60 * 1000 // 5 minutes
             );
-
+            
             return (
               <Message 
                 key={message._id} 
@@ -95,6 +95,7 @@ export default function MessageList() {
                 showAvatar={showAvatar}
                 isLastMessage={isLastMessage}
               />
+              
             );
           })}
         </div>
