@@ -7,9 +7,9 @@ import {
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   SignalIcon,
-  SignalSlashIcon
+  SignalSlashIcon,
+  Bars3Icon, XMarkIcon 
 } from '@heroicons/react/24/outline';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function Header({ isMobileListOpen, setIsMobileListOpen }) {
   const { user, logout } = useAuth();

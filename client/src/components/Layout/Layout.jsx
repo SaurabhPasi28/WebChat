@@ -1,5 +1,5 @@
 import ChatContainer from '../Chat/ChatContainer.jsx';
-import Header from './Header.jsx';
+// import Header from './Header.jsx';
 import { useState } from 'react';
 
 export default function Layout({ children }) {

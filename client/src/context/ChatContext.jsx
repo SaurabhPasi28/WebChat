@@ -45,7 +45,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle incoming new message
   const handleNewMessage = useCallback((message) => {
-    console.log('📨 Received new message:', message);
+    // console.log('📨 Received new message:', message);
     setMessages(prev => {
       // Replace temp message if exists
       const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
@@ -63,12 +63,12 @@ export const ChatProvider = ({ children }) => {
 
   // Handle typing indicators
   const handleTyping = useCallback((userId) => {
-    console.log('⌨️ User typing:', userId);
+    // console.log('⌨️ User typing:', userId);
     setTypingUsers(prev => new Set([...prev, userId]));
   }, []);
 
   const handleStopTyping = useCallback((userId) => {
-    console.log('⌨️ User stopped typing:', userId);
+    // console.log('⌨️ User stopped typing:', userId);
     setTypingUsers(prev => {
       const newSet = new Set(prev);
       newSet.delete(userId);
@@ -78,7 +78,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle user status changes
   const handleUserStatusChange = useCallback(({ userId, isOnline }) => {
-    console.log('👤 User status changed:', userId, isOnline);
+    // console.log('👤 User status changed:', userId, isOnline);
     setUsers(prev => prev.map(user => 
       user._id === userId ? { ...user, isOnline } : user
     ));
@@ -96,7 +96,7 @@ export const ChatProvider = ({ children }) => {
 
   // Handle messages read
   const handleMessagesRead = useCallback(({ readerId }) => {
-    console.log('📖 Messages read by:', readerId);
+    // console.log('📖 Messages read by:', readerId);
     setMessages(prev => 
       prev.map(msg => 
         msg.sender._id === readerId ? { ...msg, status: 'read' } : msg
@@ -111,7 +111,7 @@ export const ChatProvider = ({ children }) => {
       return;
     }
     
-    console.log('🔧 Setting up socket listeners...');
+    // console.log('🔧 Setting up socket listeners...');
     
     // Remove existing listeners to prevent duplicates
     socket.off('receiveMessage');
@@ -246,59 +246,124 @@ export const ChatProvider = ({ children }) => {
   }, [messages]);
 
   // Send a new message
-  const sendMessage = useCallback((content) => {
-    console.log('📤 Attempting to send message:', content);
-    console.log('🔌 Socket available:', !!socket, 'Selected user:', !!selectedUser, 'User:', !!user, 'Connected:', isConnected);
+  // const sendMessage = useCallback((content) => {
+  //   console.log('📤 Attempting to send message:', content);
+  //   console.log('🔌 Socket available:', !!socket, 'Selected user:', !!selectedUser, 'User:', !!user, 'Connected:', isConnected);
     
-    if (socket && selectedUser && user && content.trim() && isConnected) {
-      console.log('📤 Sending message via socket...');
+  //   if (socket && selectedUser && user && content.trim() && isConnected) {
+  //     console.log('📤 Sending message via socket...');
       
-      // Create temporary message for immediate UI update
-      const tempMessage = {
-        _id: Date.now().toString(),
-        sender: { _id: user.userId, username: user.username },
-        receiver: selectedUser._id,
-        content,
-        createdAt: new Date().toISOString(),
-        isTemp: true,
-        status: 'sent'
-      };
+  //     // Create temporary message for immediate UI update
+  //     const tempMessage = {
+  //       _id: Date.now().toString(),
+  //       sender: { _id: user.userId, username: user.username },
+  //       receiver: selectedUser._id,
+  //       content,
+  //       createdAt: new Date().toISOString(),
+  //       isTemp: true,
+  //       status: 'sent'
+  //     };
       
-      // Add to messages immediately
-      setMessages(prev => [...prev, tempMessage]);
+  //     // Add to messages immediately
+  //     setMessages(prev => [...prev, tempMessage]);
       
-      // Send via socket
-      socket.emit('sendMessage', {
-        senderId: user.userId,
-        receiverId: selectedUser._id,
-        content
+  //     // Send via socket
+  //     socket.emit('sendMessage', {
+  //       senderId: user.userId,
+  //       receiverId: selectedUser._id,
+  //       content
+  //     });
+
+  //     // Update message status after delay
+  //     messageStatusTimeout.current = setTimeout(() => {
+  //       setMessages(prev =>
+  //         prev.map(msg =>
+  //           msg._id === tempMessage._id 
+  //             ? { ...msg, status: 'delivered' } 
+  //             : msg
+  //         )
+  //       );
+  //     }, 1000);
+  //   } 
+  //   else {
+  //     console.error('❌ Cannot send message - missing requirements');
+  //     console.error('Socket:', !!socket);
+  //     console.error('Selected user:', !!selectedUser);
+  //     console.error('User:', !!user);
+  //     console.error('Content:', !!content);
+  //     console.error('Connected:', isConnected);
+      
+  //     // Try to reconnect if not connected
+  //     if (!isConnected && user?.userId) {
+  //       console.log('🔄 Attempting to reconnect socket...');
+  //       connect(user.userId);
+  //     }
+  //   }
+  // }, [socket, selectedUser, user, isConnected, connect]);
+
+  const UNSENT_MESSAGES_KEY = 'unsentMessages';
+
+const sendMessage = useCallback((content) => {
+  const payload = {
+    senderId: user.userId,
+    receiverId: selectedUser?._id,
+    content,
+    createdAt: new Date().toISOString()
+  };
+
+  if (socket && isConnected && selectedUser && user && content.trim()) {
+    console.log('📤 Sending message via socket...');
+
+    const tempMessage = {
+      _id: Date.now().toString(),
+      sender: { _id: user.userId, username: user.username },
+      receiver: selectedUser._id,
+      content,
+      createdAt: payload.createdAt,
+      isTemp: true,
+      status: 'sent'
+    };
+
+    setMessages(prev => [...prev, tempMessage]);
+
+    socket.emit('sendMessage', payload);
+
+    messageStatusTimeout.current = setTimeout(() => {
+      setMessages(prev =>
+        prev.map(msg =>
+          msg._id === tempMessage._id ? { ...msg, status: 'delivered' } : msg
+        )
+      );
+    }, 1000);
+  } else {
+    console.warn('⚠️ Socket not connected, saving message locally');
+
+    const unsent = JSON.parse(localStorage.getItem(UNSENT_MESSAGES_KEY)) || [];
+    localStorage.setItem(UNSENT_MESSAGES_KEY, JSON.stringify([...unsent, payload]));
+
+    // Try reconnect
+    if (!isConnected && user?.userId) {
+      connect(user.userId);
+    }
+  }
+}, [socket, selectedUser, user, isConnected, connect]);
+
+useEffect(() => {
+  if (isConnected && socket && user) {
+    const unsent = JSON.parse(localStorage.getItem(UNSENT_MESSAGES_KEY)) || [];
+
+    if (unsent.length > 0) {
+      console.log('📤 Resending unsent messages:', unsent.length);
+
+      unsent.forEach(msg => {
+        socket.emit('sendMessage', msg);
       });
 
-      // Update message status after delay
-      messageStatusTimeout.current = setTimeout(() => {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg._id === tempMessage._id 
-              ? { ...msg, status: 'delivered' } 
-              : msg
-          )
-        );
-      }, 1000);
-    } else {
-      console.error('❌ Cannot send message - missing requirements');
-      console.error('Socket:', !!socket);
-      console.error('Selected user:', !!selectedUser);
-      console.error('User:', !!user);
-      console.error('Content:', !!content);
-      console.error('Connected:', isConnected);
-      
-      // Try to reconnect if not connected
-      if (!isConnected && user?.userId) {
-        console.log('🔄 Attempting to reconnect socket...');
-        connect(user.userId);
-      }
+      localStorage.removeItem(UNSENT_MESSAGES_KEY);
     }
-  }, [socket, selectedUser, user, isConnected, connect]);
+  }
+}, [isConnected, socket, user]);
+
 
   // Clear error
   const clearError = useCallback(() => {
