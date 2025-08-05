@@ -68,7 +68,7 @@ export default function MessageList() {
         {/* Welcome Message */}
         <div className="text-center py-4">
           <div className="inline-flex items-center space-x-2 bg-gray-100 dark:bg-dark-surface rounded-full px-4 py-2 shadow-soft dark:shadow-soft-dark">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className={`w-2 h-2 rounded-full ${selectedUser.isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-sm text-gray-600 dark:text-dark-textSecondary">
               {selectedUser.username} is {selectedUser.isOnline ? 'online' : 'offline'}
             </span>
