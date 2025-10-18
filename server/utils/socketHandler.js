@@ -70,13 +70,37 @@ export const configureSocket = (io) => {
         await message.save();
         await message.populate('sender receiver', 'username avatar status');
         
-        // Send to receiver
-        io.to(receiverId).emit('receiveMessage', message);
+        console.log(`💬 Message created from ${senderId} to ${receiverId}, ID: ${message._id}`);
         
-        // Send back to sender for confirmation
+        // Send back to sender for confirmation (with 'sent' status)
         socket.emit('messageSent', message);
         
-        console.log(`💬 Message sent from ${senderId} to ${receiverId}`);
+        // Check if receiver is online by finding their socket
+        const receiverSocket = Array.from(io.sockets.sockets.values()).find(
+          s => s.userId === receiverId
+        );
+        
+        if (receiverSocket) {
+          // Receiver is online - update to delivered immediately
+          message.status = 'delivered';
+          await Message.findByIdAndUpdate(message._id, { status: 'delivered' });
+          
+          console.log(`✅ Receiver ${receiverId} is online, marking as delivered`);
+          
+          // Send to receiver with 'delivered' status
+          io.to(receiverId).emit('receiveMessage', message);
+          
+          // Notify sender that message was delivered
+          socket.emit('messageDelivered', { messageId: message._id, status: 'delivered' });
+          
+          console.log(`� Message delivered to ${receiverId}`);
+        } else {
+          // Receiver is offline - keep as 'sent'
+          console.log(`⏸️ Receiver ${receiverId} is offline, message stays as 'sent'`);
+          
+          // Still send to receiver's room (will get when they connect)
+          io.to(receiverId).emit('receiveMessage', message);
+        }
       } catch (error) {
         console.error('Error sending message:', error);
         socket.emit('messageError', { error: 'Failed to send message' });
@@ -95,19 +119,23 @@ export const configureSocket = (io) => {
     // Mark messages as read
     socket.on('markAsRead', async ({ senderId, receiverId }) => {
       try {
-        await Message.updateMany(
+        const result = await Message.updateMany(
           {
             sender: senderId,
             receiver: receiverId,
             status: { $ne: 'read' }
           },
-          { $set: { status: 'read' } }
+          { $set: { status: 'read', readAt: new Date() } }
         );
         
-        // Notify sender that messages were read
-        io.to(senderId).emit('messagesRead', { readerId: receiverId });
+        console.log(`👁️ Marked ${result.modifiedCount} messages as read by ${receiverId} from ${senderId}`);
         
-        console.log(`👁️ Messages marked as read by ${receiverId}`);
+        // Notify sender that their messages were seen/read
+        io.to(senderId).emit('messagesSeen', { 
+          readerId: receiverId,
+          status: 'read'
+        });
+        
       } catch (error) {
         console.error('Error marking messages as read:', error);
       }

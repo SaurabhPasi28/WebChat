@@ -1,7 +1,7 @@
 import { useChat } from '../../context/ChatContext';
 
 export default function UserProfile() {
-  const { selectedUser } = useChat();
+  const { onlineUsers,selectedUser } = useChat();
 
   if (!selectedUser) {
     return null;
@@ -16,7 +16,7 @@ export default function UserProfile() {
             {selectedUser.username.charAt(0).toUpperCase()}
           </span>
         </div>
-        {selectedUser.isOnline && (
+        {(selectedUser.isOnline || onlineUsers.has(selectedUser._id)) && (
           <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-dark-bg"></div>
         )}
       </div>
@@ -27,7 +27,7 @@ export default function UserProfile() {
           {selectedUser.username}
         </h3>
         <p className="text-sm text-gray-500 dark:text-dark-textSecondary">
-          {selectedUser.isOnline ? 'Online' : 'Offline'}
+          {(selectedUser.isOnline || onlineUsers.has(selectedUser._id)) ? 'Online' : 'Offline'}
         </p>
       </div>
 

@@ -55,7 +55,7 @@ export default function MessageList() {
           Send your first message to begin chatting
         </p>
         <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <div className={`w-2 h-2 rounded-full ${selectedUser.isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
           <span>{selectedUser.isOnline ? 'Online' : 'Offline'}</span>
         </div>
       </div>

@@ -12,9 +12,9 @@ export default function Message({ message, isOwnMessage, showAvatar }) {
   // Message status component
   const MessageStatus = ({ status }) => {
     const statusConfig = {
-      sent: { icon: CheckIcon, color: 'text-gray-400 dark:text-gray-500' },
-      delivered: { icon: CheckIcon, color: 'text-blue-500 dark:text-blue-400' },
-      read: { icon: CheckCircleIcon, color: 'text-blue-600 dark:text-blue-400' },
+      sent: { icon: CheckIcon, color: 'text-gray-200 dark:text-gray-200' },
+      delivered: { icon: CheckIcon, color: 'text-blue-500 dark:text-blue-500' },
+      read: { icon: CheckCircleIcon, color: 'text-green-300 dark:text-green-300' },
       failed: { icon: ExclamationTriangleIcon, color: 'text-red-500 dark:text-red-400' }
     };
 
@@ -46,7 +46,7 @@ export default function Message({ message, isOwnMessage, showAvatar }) {
             className={`
               px-4 py-2 rounded-2xl shadow-soft dark:shadow-soft-dark relative
               ${isOwnMessage 
-                ? 'bg-primary-600 text-white rounded-br-md' 
+                ? 'bg-primary-900 text-white rounded-br-md' 
                 : 'bg-gray-100 dark:bg-dark-surface text-gray-800 dark:text-dark-text rounded-bl-md border border-gray-200 dark:border-dark-border'
               }
             `}

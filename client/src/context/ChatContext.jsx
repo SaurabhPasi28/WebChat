@@ -45,21 +45,39 @@ export const ChatProvider = ({ children }) => {
 
   // Handle incoming new message
   const handleNewMessage = useCallback((message) => {
-    // console.log('📨 Received new message:', message);
-    setMessages(prev => {
-      // Replace temp message if exists
-      const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
-      return [...filtered, message];
-    });
+    console.log('📨 Received new message:', message);
+    
+    // Only add message if it's part of the current conversation
+    if (selectedUser) {
+      const messageSenderId = message.sender?._id || message.sender;
+      const messageReceiverId = message.receiver?._id || message.receiver;
+      
+      // Check if this message belongs to the current conversation
+      const isPartOfCurrentChat = 
+        (messageSenderId === selectedUser._id && messageReceiverId === user.userId) ||
+        (messageSenderId === user.userId && messageReceiverId === selectedUser._id);
+      
+      if (isPartOfCurrentChat) {
+        console.log('✅ Message belongs to current chat, adding to UI');
+        setMessages(prev => {
+          // Replace temp message if exists
+          const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
+          return [...filtered, message];
+        });
+      } else {
+        console.log('⏭️ Message not for current chat, skipping UI update');
+      }
+    }
 
     // Update unread count if not current chat
-    if (selectedUser?._id !== message.sender._id) {
+    const messageSenderId = message.sender?._id || message.sender;
+    if (selectedUser?._id !== messageSenderId) {
       setUnreadCounts(prev => ({
         ...prev,
-        [message.sender._id]: (prev[message.sender._id] || 0) + 1
+        [messageSenderId]: (prev[messageSenderId] || 0) + 1
       }));
     }
-  }, [selectedUser]);
+  }, [selectedUser, user?.userId]);
 
   // Handle typing indicators
   const handleTyping = useCallback((userId) => {
@@ -104,6 +122,59 @@ export const ChatProvider = ({ children }) => {
     );
   }, []);
 
+  // Handle message sent confirmation from server
+  const handleMessageSent = useCallback((message) => {
+    console.log('✅ Message sent confirmation received:', message._id);
+    
+    // Only update if this message belongs to the current conversation
+    if (selectedUser) {
+      const messageReceiverId = message.receiver?._id || message.receiver;
+      
+      if (messageReceiverId === selectedUser._id) {
+        console.log('✅ Message belongs to current chat, replacing temp message');
+        setMessages(prev => 
+          prev.map(msg => {
+            // Replace temp message with real message from server
+            if (msg.isTemp && msg.content === message.content) {
+              return { ...message, isTemp: false };
+            }
+            return msg;
+          })
+        );
+      } else {
+        console.log('⏭️ Message sent confirmation not for current chat, ignoring');
+      }
+    }
+  }, [selectedUser]);
+
+  // Handle message delivered confirmation
+  const handleMessageDelivered = useCallback(({ messageId, status }) => {
+    console.log('📨 Message delivered confirmation:', messageId);
+    setMessages(prev => 
+      prev.map(msg => 
+        msg._id === messageId ? { ...msg, status: 'delivered' } : msg
+      )
+    );
+  }, []);
+
+  // Handle messages seen/read by receiver
+  const handleMessagesSeen = useCallback(({ readerId, status }) => {
+    console.log('👁️ Messages seen by:', readerId, '- Updating messages in current view');
+    setMessages(prev => 
+      prev.map(msg => {
+        // Update MY messages that were sent TO the reader (readerId)
+        // msg.sender._id is ME (current user)
+        // msg.receiver._id or msg.receiver is the person who read it (readerId)
+        const msgReceiverId = msg.receiver?._id || msg.receiver;
+        if (msgReceiverId === readerId) {
+          console.log('✓ Updating message', msg._id, 'to read status');
+          return { ...msg, status: 'read' };
+        }
+        return msg;
+      })
+    );
+  }, []);
+
   // Setup socket listeners
   const setupSocketListeners = useCallback(() => {
     if (!socket) {
@@ -111,17 +182,23 @@ export const ChatProvider = ({ children }) => {
       return;
     }
     
-    // console.log('🔧 Setting up socket listeners...');
+    console.log('🔧 Setting up socket listeners...');
     
     // Remove existing listeners to prevent duplicates
     socket.off('receiveMessage');
+    socket.off('messageSent');
+    socket.off('messageDelivered');
+    socket.off('messagesSeen');
     socket.off('typing');
     socket.off('stopTyping');
     socket.off('userStatusChanged');
     socket.off('messagesRead');
     
-    // Message handling
+    // Message handling - ORDER MATTERS!
+    socket.on('messageSent', handleMessageSent);
+    socket.on('messageDelivered', handleMessageDelivered);
     socket.on('receiveMessage', handleNewMessage);
+    socket.on('messagesSeen', handleMessagesSeen);
     
     // Typing indicators
     socket.on('typing', handleTyping);
@@ -130,11 +207,11 @@ export const ChatProvider = ({ children }) => {
     // User status changes
     socket.on('userStatusChanged', handleUserStatusChange);
     
-    // Message read receipts
+    // Legacy support
     socket.on('messagesRead', handleMessagesRead);
     
     console.log('✅ Socket listeners set up successfully');
-  }, [socket, handleNewMessage, handleTyping, handleStopTyping, handleUserStatusChange, handleMessagesRead]);
+  }, [socket, handleMessageSent, handleMessageDelivered, handleNewMessage, handleMessagesSeen, handleTyping, handleStopTyping, handleUserStatusChange, handleMessagesRead]);
 
   // Initialize chat when user is authenticated
   useEffect(() => {
@@ -167,6 +244,9 @@ export const ChatProvider = ({ children }) => {
       if (socket) {
         console.log('🧹 Cleaning up socket listeners...');
         socket.off('receiveMessage');
+        socket.off('messageSent');
+        socket.off('messageDelivered');
+        socket.off('messagesSeen');
         socket.off('typing');
         socket.off('stopTyping');
         socket.off('userStatusChanged');
@@ -177,6 +257,38 @@ export const ChatProvider = ({ children }) => {
     };
   }, [socket]);
 
+  // Mark messages as read when viewing a conversation
+  useEffect(() => {
+    if (selectedUser && socket && isConnected && messages.length > 0) {
+      // Find unread messages from the selected user
+      const unreadMessages = messages.filter(msg => {
+        const msgSenderId = msg.sender?._id || msg.sender;
+        return msgSenderId === selectedUser._id && msg.status !== 'read';
+      });
+
+      if (unreadMessages.length > 0) {
+        console.log(`📖 Auto-marking ${unreadMessages.length} messages as read from ${selectedUser.username}`);
+        
+        // Update UI immediately
+        setMessages(prev => 
+          prev.map(msg => {
+            const msgSenderId = msg.sender?._id || msg.sender;
+            if (msgSenderId === selectedUser._id && msg.status !== 'read') {
+              return { ...msg, status: 'read' };
+            }
+            return msg;
+          })
+        );
+
+        // Notify server and sender
+        socket.emit('markAsRead', {
+          senderId: selectedUser._id,
+          receiverId: user.userId
+        });
+      }
+    }
+  }, [selectedUser, messages.length, socket, isConnected, user?.userId]);
+
   // Fetch messages for selected user
   const fetchMessages = async (receiverId) => {
     try {
@@ -185,9 +297,24 @@ export const ChatProvider = ({ children }) => {
       const data = await chatAPI.getMessages(receiverId);
       setMessages(data);
       
-      // Mark messages as read
+      // Mark messages as read - this notifies the SENDER via socket
       if (data.length > 0 && socket && isConnected) {
-        console.log('📖 Marking messages as read for:', receiverId);
+        console.log('📖 Marking messages as read from:', receiverId);
+        
+        // Immediately update UI on receiver's side
+        setMessages(prev => 
+          prev.map(msg => {
+            // Mark messages FROM the selected user as read
+            const msgSenderId = msg.sender?._id || msg.sender;
+            if (msgSenderId === receiverId && msg.status !== 'read') {
+              console.log('✓ Marking message', msg._id, 'as read locally');
+              return { ...msg, status: 'read' };
+            }
+            return msg;
+          })
+        );
+        
+        // Emit to server to notify sender
         socket.emit('markAsRead', {
           senderId: receiverId,
           receiverId: user.userId
@@ -205,11 +332,11 @@ export const ChatProvider = ({ children }) => {
   };
 
   // Select a user to chat with
-  const selectUser = useCallback((user) => {
-    console.log('👤 Selecting user:', user.username);
-    setSelectedUser(user);
-    fetchMessages(user._id);
-  }, [user?.userId]);
+  const selectUser = useCallback((selectedUserObj) => {
+    console.log('👤 Selecting user:', selectedUserObj.username);
+    setSelectedUser(selectedUserObj);
+    fetchMessages(selectedUserObj._id);
+  }, [user?.userId, socket, isConnected]);
 
   // Typing indicator handler
   const sendTyping = useCallback(() => {
@@ -314,27 +441,26 @@ const sendMessage = useCallback((content) => {
   if (socket && isConnected && selectedUser && user && content.trim()) {
     console.log('📤 Sending message via socket...');
 
+    // Create temporary message with unique ID
     const tempMessage = {
-      _id: Date.now().toString(),
+      _id: `temp_${Date.now()}_${Math.random()}`,
       sender: { _id: user.userId, username: user.username },
-      receiver: selectedUser._id,
+      receiver: { _id: selectedUser._id, username: selectedUser.username },
       content,
       createdAt: payload.createdAt,
       isTemp: true,
       status: 'sent'
     };
 
+    // Add temp message to UI immediately
     setMessages(prev => [...prev, tempMessage]);
 
+    // Send to server - server will handle status updates via socket events
     socket.emit('sendMessage', payload);
-
-    messageStatusTimeout.current = setTimeout(() => {
-      setMessages(prev =>
-        prev.map(msg =>
-          msg._id === tempMessage._id ? { ...msg, status: 'delivered' } : msg
-        )
-      );
-    }, 1000);
+    
+    // DON'T set timeout - let socket events handle status updates!
+    console.log('📤 Message sent to server, waiting for confirmation...');
+    
   } else {
     console.warn('⚠️ Socket not connected, saving message locally');
 
@@ -371,6 +497,7 @@ useEffect(() => {
   }, []);
 
   // Context value
+  // Context value
   const value = {
     users,
     selectedUser,
@@ -390,6 +517,7 @@ useEffect(() => {
     clearError,
     socket,
     isConnected,
+    connect,
   };
 
   return (
