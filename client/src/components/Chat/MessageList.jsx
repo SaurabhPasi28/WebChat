@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 import Message from './Message';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 export default function MessageList() {
   const { messages, selectedUser, loading } = useChat();
@@ -12,6 +13,29 @@ export default function MessageList() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Helper function to get formatted date label
+  const getDateLabel = (date) => {
+    const messageDate = new Date(date);
+    
+    if (isToday(messageDate)) {
+      return 'Today';
+    } else if (isYesterday(messageDate)) {
+      return 'Yesterday';
+    } else {
+      return format(messageDate, 'MMMM dd, yyyy');
+    }
+  };
+
+  // Helper function to check if we should show date separator
+  const shouldShowDateSeparator = (currentMessage, previousMessage) => {
+    if (!previousMessage) return true; // Always show for first message
+    
+    const currentDate = new Date(currentMessage.createdAt);
+    const previousDate = new Date(previousMessage.createdAt);
+    
+    return !isSameDay(currentDate, previousDate);
+  };
 
   if (loading) {
     return (
@@ -81,6 +105,8 @@ export default function MessageList() {
             const isOwnMessage = message.sender._id === user?.userId;
             const isLastMessage = index === messages.length - 1;
             const nextMessage = messages[index + 1];
+            const previousMessage = messages[index - 1];
+            const showDateSeparator = shouldShowDateSeparator(message, previousMessage);
             const showAvatar = !isOwnMessage && (
               !nextMessage || 
               nextMessage.sender._id !== message.sender._id ||
@@ -88,14 +114,31 @@ export default function MessageList() {
             );
             
             return (
-              <Message 
-                key={message._id} 
-                message={message} 
-                isOwnMessage={isOwnMessage}
-                showAvatar={showAvatar}
-                isLastMessage={isLastMessage}
-              />
-              
+              <div key={message._id}>
+                {/* Date Separator */}
+                {showDateSeparator && (
+                  <div className="flex items-center justify-center my-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                        <div className="w-full border-t border-gray-200 dark:border-dark-border"></div>
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="px-4 py-1 bg-gray-100 dark:bg-dark-surface text-xs font-medium text-gray-600 dark:text-dark-textSecondary rounded-full shadow-sm border border-gray-200 dark:border-dark-border">
+                          {getDateLabel(message.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message */}
+                <Message 
+                  message={message} 
+                  isOwnMessage={isOwnMessage}
+                  showAvatar={showAvatar}
+                  isLastMessage={isLastMessage}
+                />
+              </div>
             );
           })}
         </div>

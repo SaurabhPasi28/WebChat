@@ -47,69 +47,117 @@ export const ChatProvider = ({ children }) => {
 
   // Handle incoming new message
   const handleNewMessage = useCallback((message) => {
-    console.log('📨 Received new message:', message);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📨 NEW MESSAGE RECEIVED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     const messageSenderId = message.sender?._id || message.sender;
     const messageReceiverId = message.receiver?._id || message.receiver;
     const senderUsername = message.sender?.username || 'Someone';
     
-    // Only add message if it's part of the current conversation
+    console.log('👤 From:', senderUsername);
+    console.log('📝 Content:', message.content.substring(0, 50));
+    console.log('🆔 Sender ID:', messageSenderId);
+    console.log('🆔 Your ID:', user.userId);
+    
+    // Skip if message is from current user
+    if (messageSenderId === user.userId) {
+      console.log('⏭️ Skipping - message is from current user');
+      return;
+    }
+    
+    // Check if tab is currently visible/focused
+    const isTabVisible = !document.hidden;
+    const isWindowFocused = document.hasFocus();
+    console.log('🔍 Tab visible:', isTabVisible);
+    console.log('🔍 Document hidden:', document.hidden);
+    console.log('🔍 Window focused:', isWindowFocused);
+    
+    // Determine if this message is for current chat
+    let isPartOfCurrentChat = false;
     if (selectedUser) {
-      // Check if this message belongs to the current conversation
-      const isPartOfCurrentChat = 
+      isPartOfCurrentChat = 
         (messageSenderId === selectedUser._id && messageReceiverId === user.userId) ||
         (messageSenderId === user.userId && messageReceiverId === selectedUser._id);
+    }
+    
+    console.log('💬 Selected user:', selectedUser?.username || 'None');
+    console.log('🎯 Part of current chat:', isPartOfCurrentChat);
+    
+    // Add message to UI if it's part of current conversation
+    if (selectedUser && isPartOfCurrentChat) {
+      console.log('✅ Adding message to current chat UI');
+      setMessages(prev => {
+        // Replace temp message if exists
+        const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
+        return [...filtered, message];
+      });
+    }
+    
+    // ENHANCED NOTIFICATION LOGIC
+    // Always show notification if ANY of these conditions:
+    const shouldShowNotification = 
+      !isTabVisible ||           // Tab not visible
+      !isWindowFocused ||        // Window not focused
+      !selectedUser ||           // No chat selected
+      !isPartOfCurrentChat;      // Different chat
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔔 NOTIFICATION DECISION');
+    console.log('Should show:', shouldShowNotification);
+    console.log('Reason:', {
+      tabNotVisible: !isTabVisible,
+      windowNotFocused: !isWindowFocused,
+      noUserSelected: !selectedUser,
+      differentChat: !isPartOfCurrentChat
+    });
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    if (shouldShowNotification) {
+      console.log('� TRIGGERING NOTIFICATION NOW!');
       
+      // Use force show for maximum reliability
+      notificationService.forceShowNotification({
+        username: senderUsername,
+        message: message.content,
+        onClick: () => {
+          console.log('🖱️ Notification clicked, focusing window');
+          window.focus();
+          // Switch to the sender's chat when clicking notification
+          const sender = users.find(u => u._id === messageSenderId);
+          if (sender) {
+            setSelectedUser(sender);
+          }
+        }
+      });
+    }
+    
+    // Show in-app toast only if tab is visible
+    if (isTabVisible && isWindowFocused) {
       if (isPartOfCurrentChat) {
-        console.log('✅ Message belongs to current chat, adding to UI');
-        setMessages(prev => {
-          // Replace temp message if exists
-          const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
-          return [...filtered, message];
+        // Current chat - show message preview
+        toast.success(`${senderUsername}: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`, {
+          duration: 3000,
+          position: 'top-right'
         });
-        
-        // Show in-app toast if message is from someone else
-        if (messageSenderId !== user.userId) {
-          toast.success(`${senderUsername}: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`, {
-            duration: 3000,
-            position: 'top-right'
-          });
-        }
       } else {
-        console.log('⏭️ Message not for current chat, skipping UI update');
-        
-        // Show notification for messages from other conversations
-        if (messageSenderId !== user.userId) {
-          // Browser notification
-          notificationService.showNewMessage({
-            username: senderUsername,
-            message: message.content,
-            onClick: () => {
-              // Switch to the sender's chat when clicking notification
-              const sender = users.find(u => u._id === messageSenderId);
-              if (sender) {
-                setSelectedUser(sender);
-              }
-            }
-          });
-          
-          // In-app toast
-          toast(`New message from ${senderUsername}`, {
-            duration: 4000,
-            position: 'top-right',
-            icon: '💬'
-          });
-        }
+        // Different chat - show notification
+        toast(`💬 New message from ${senderUsername}`, {
+          duration: 4000,
+          position: 'top-right',
+        });
       }
     }
 
     // Update unread count if not current chat
-    if (selectedUser?._id !== messageSenderId && messageSenderId !== user.userId) {
+    if (selectedUser?._id !== messageSenderId) {
       setUnreadCounts(prev => ({
         ...prev,
         [messageSenderId]: (prev[messageSenderId] || 0) + 1
       }));
     }
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }, [selectedUser, user?.userId, users]);
 
   // Handle typing indicators
@@ -272,20 +320,66 @@ export const ChatProvider = ({ children }) => {
   // Initialize chat when user is authenticated
   useEffect(() => {
     if (user) {
-      console.log('👤 User authenticated, fetching users...');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('👤 USER AUTHENTICATED - INITIALIZING');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       fetchUsers();
       
-      // Request notification permission
-      notificationService.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          console.log('✅ Notification permission granted');
-          toast.success('Notifications enabled!', { duration: 2000 });
-        } else if (permission === 'denied') {
-          console.log('❌ Notification permission denied');
-        }
-      });
+      // Request notification permission with delay to ensure page is fully loaded
+      setTimeout(() => {
+        console.log('🔔 Requesting notification permission...');
+        notificationService.requestPermission().then(permission => {
+          console.log('🔔 Permission result:', permission);
+          if (permission === 'granted') {
+            console.log('✅ NOTIFICATION PERMISSION GRANTED!');
+            toast.success('🔔 Browser notifications enabled!', { 
+              duration: 3000,
+              style: {
+                background: '#10b981',
+                color: 'white',
+              }
+            });
+            
+            // Test notification
+            setTimeout(() => {
+              console.log('🧪 Sending test notification...');
+              notificationService.show('WebChat Ready!', {
+                body: 'You will receive notifications for new messages',
+                tag: 'test-notification'
+              });
+            }, 1000);
+          } else if (permission === 'denied') {
+            console.error('❌ NOTIFICATION PERMISSION DENIED!');
+            toast.error('⚠️ Notifications blocked! Click the 🔒 icon in address bar to enable', { 
+              duration: 6000,
+              style: {
+                background: '#ef4444',
+                color: 'white',
+              }
+            });
+          } else {
+            console.warn('⚠️ Notification permission not granted yet');
+            toast('Click "Allow" when asked for notifications', { 
+              duration: 4000,
+              icon: '🔔'
+            });
+          }
+        }).catch(error => {
+          console.error('❌ Error requesting permission:', error);
+        });
+      }, 1000);
     }
   }, [user, fetchUsers]);
+
+  // Listen for page visibility changes for debugging
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      console.log(`👁️ Page visibility changed - Hidden: ${document.hidden}`);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Connect socket when user is authenticated (only once per user)
   useEffect(() => {
