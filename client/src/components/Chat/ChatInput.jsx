@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
+import EmojiPicker from 'emoji-picker-react';
 import { 
   PaperAirplaneIcon, 
   PaperClipIcon, 
@@ -12,10 +13,12 @@ import {
 export default function ChatInput() {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { sendMessage, selectedUser, sendTyping, socket, isConnected, connect } = useChat();
   const { user } = useAuth();
   const typingTimeoutRef = useRef(null);
   const inputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   // Handle typing indicators
   useEffect(() => {
@@ -72,9 +75,26 @@ export default function ChatInput() {
   };
 
   const handleEmojiPicker = () => {
-    // TODO: Implement emoji picker
-    console.log('Emoji picker clicked');
+    setShowEmojiPicker(!showEmojiPicker);
   };
+
+  const onEmojiClick = (emojiData) => {
+    setMessage(prev => prev + emojiData.emoji);
+    inputRef.current?.focus();
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target) && 
+          !event.target.closest('[data-emoji-button]')) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleRetryConnection = () => {
     console.log('Manual retry connection requested');
@@ -147,14 +167,41 @@ export default function ChatInput() {
           </div>
 
           {/* Emoji Button */}
-          <button
-            type="button"
-            onClick={handleEmojiPicker}
-            className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border"
-            title="Add emoji"
-          >
-            <FaceSmileIcon className="h-5 w-5" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              data-emoji-button
+              onClick={handleEmojiPicker}
+              className={`p-2 transition-colors rounded-lg ${
+                showEmojiPicker 
+                  ? 'text-primary-600 dark:text-primary-400 bg-gray-100 dark:bg-dark-border' 
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-border'
+              }`}
+              title="Add emoji"
+            >
+              <FaceSmileIcon className="h-5 w-5" />
+            </button>
+            
+            {/* Emoji Picker Popup */}
+            {showEmojiPicker && (
+              <div 
+                ref={emojiPickerRef}
+                className="absolute bottom-14 right-0 z-50 shadow-2xl rounded-lg overflow-hidden"
+              >
+                <EmojiPicker
+                  onEmojiClick={onEmojiClick}
+                  theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                  emojiStyle="native"
+                  width={320}
+                  height={400}
+                  searchPlaceHolder="Search emoji..."
+                  previewConfig={{
+                    showPreview: false
+                  }}
+                />
+              </div>
+            )}
+          </div>
 
           {/* Send Button */}
           <button

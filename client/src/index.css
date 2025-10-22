@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --toast-bg: #fff;
+  --toast-color: #333;
+}
+
+.dark {
+  --toast-bg: #1f2937;
+  --toast-color: #f9fafb;
+}
+
 body {
   margin: 0px;
   padding: 0px;

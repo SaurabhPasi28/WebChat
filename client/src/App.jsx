@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ChatProvider } from './context/ChatContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
@@ -18,6 +19,33 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <ChatProvider>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                // Default options
+                duration: 3000,
+                style: {
+                  background: 'var(--toast-bg, #fff)',
+                  color: 'var(--toast-color, #333)',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                },
+                // Success
+                success: {
+                  iconTheme: {
+                    primary: '#10b981',
+                    secondary: '#fff',
+                  },
+                },
+                // Error
+                error: {
+                  iconTheme: {
+                    primary: '#ef4444',
+                    secondary: '#fff',
+                  },
+                },
+              }}
+            />
             <Suspense fallback={<Spinner />}>
               <Routes>
                 {/* Public routes */}

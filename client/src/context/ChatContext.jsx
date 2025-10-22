@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 import { useSocket } from '../services/socket.js';
 import { chatAPI } from '../services/api.js';
 import { useAuth } from './AuthContext.jsx';
+import notificationService from '../utils/notifications.js';
+import toast from 'react-hot-toast';
 
 const ChatContext = createContext();
 
@@ -47,11 +49,12 @@ export const ChatProvider = ({ children }) => {
   const handleNewMessage = useCallback((message) => {
     console.log('📨 Received new message:', message);
     
+    const messageSenderId = message.sender?._id || message.sender;
+    const messageReceiverId = message.receiver?._id || message.receiver;
+    const senderUsername = message.sender?.username || 'Someone';
+    
     // Only add message if it's part of the current conversation
     if (selectedUser) {
-      const messageSenderId = message.sender?._id || message.sender;
-      const messageReceiverId = message.receiver?._id || message.receiver;
-      
       // Check if this message belongs to the current conversation
       const isPartOfCurrentChat = 
         (messageSenderId === selectedUser._id && messageReceiverId === user.userId) ||
@@ -64,20 +67,50 @@ export const ChatProvider = ({ children }) => {
           const filtered = prev.filter(m => !m.isTemp || m._id !== message._id);
           return [...filtered, message];
         });
+        
+        // Show in-app toast if message is from someone else
+        if (messageSenderId !== user.userId) {
+          toast.success(`${senderUsername}: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`, {
+            duration: 3000,
+            position: 'top-right'
+          });
+        }
       } else {
         console.log('⏭️ Message not for current chat, skipping UI update');
+        
+        // Show notification for messages from other conversations
+        if (messageSenderId !== user.userId) {
+          // Browser notification
+          notificationService.showNewMessage({
+            username: senderUsername,
+            message: message.content,
+            onClick: () => {
+              // Switch to the sender's chat when clicking notification
+              const sender = users.find(u => u._id === messageSenderId);
+              if (sender) {
+                setSelectedUser(sender);
+              }
+            }
+          });
+          
+          // In-app toast
+          toast(`New message from ${senderUsername}`, {
+            duration: 4000,
+            position: 'top-right',
+            icon: '💬'
+          });
+        }
       }
     }
 
     // Update unread count if not current chat
-    const messageSenderId = message.sender?._id || message.sender;
-    if (selectedUser?._id !== messageSenderId) {
+    if (selectedUser?._id !== messageSenderId && messageSenderId !== user.userId) {
       setUnreadCounts(prev => ({
         ...prev,
         [messageSenderId]: (prev[messageSenderId] || 0) + 1
       }));
     }
-  }, [selectedUser, user?.userId]);
+  }, [selectedUser, user?.userId, users]);
 
   // Handle typing indicators
   const handleTyping = useCallback((userId) => {
@@ -155,25 +188,48 @@ export const ChatProvider = ({ children }) => {
         msg._id === messageId ? { ...msg, status: 'delivered' } : msg
       )
     );
+    
+    // Show toast notification
+    toast.success('Message delivered ✓✓', {
+      duration: 2000,
+      position: 'bottom-right'
+    });
   }, []);
 
   // Handle messages seen/read by receiver
   const handleMessagesSeen = useCallback(({ readerId, status }) => {
     console.log('👁️ Messages seen by:', readerId, '- Updating messages in current view');
+    
+    let updatedCount = 0;
     setMessages(prev => 
       prev.map(msg => {
         // Update MY messages that were sent TO the reader (readerId)
         // msg.sender._id is ME (current user)
         // msg.receiver._id or msg.receiver is the person who read it (readerId)
         const msgReceiverId = msg.receiver?._id || msg.receiver;
-        if (msgReceiverId === readerId) {
+        if (msgReceiverId === readerId && msg.status !== 'read') {
           console.log('✓ Updating message', msg._id, 'to read status');
+          updatedCount++;
           return { ...msg, status: 'read' };
         }
         return msg;
       })
     );
-  }, []);
+    
+    // Show notification if messages were updated
+    if (updatedCount > 0) {
+      const readerUser = users.find(u => u._id === readerId);
+      const readerName = readerUser?.username || 'User';
+      
+      toast.success(`${readerName} has seen your message${updatedCount > 1 ? 's' : ''} 👁️`, {
+        duration: 3000,
+        position: 'bottom-right'
+      });
+      
+      // Optional: Browser notification (silent)
+      notificationService.showMessageSeen(readerName, updatedCount);
+    }
+  }, [users]);
 
   // Setup socket listeners
   const setupSocketListeners = useCallback(() => {
@@ -218,6 +274,16 @@ export const ChatProvider = ({ children }) => {
     if (user) {
       console.log('👤 User authenticated, fetching users...');
       fetchUsers();
+      
+      // Request notification permission
+      notificationService.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          console.log('✅ Notification permission granted');
+          toast.success('Notifications enabled!', { duration: 2000 });
+        } else if (permission === 'denied') {
+          console.log('❌ Notification permission denied');
+        }
+      });
     }
   }, [user, fetchUsers]);
 
