@@ -5,7 +5,7 @@ import Message from './Message';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 export default function MessageList() {
-  const { messages, selectedUser, loading } = useChat();
+  const { messages, selectedUser, loading, deleteMessage } = useChat();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
 
@@ -137,6 +137,7 @@ export default function MessageList() {
                   isOwnMessage={isOwnMessage}
                   showAvatar={showAvatar}
                   isLastMessage={isLastMessage}
+                  onDeleteMessage={deleteMessage}
                 />
               </div>
             );

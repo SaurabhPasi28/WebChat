@@ -303,6 +303,10 @@ export const ChatProvider = ({ children }) => {
     socket.on('messageDelivered', handleMessageDelivered);
     socket.on('receiveMessage', handleNewMessage);
     socket.on('messagesSeen', handleMessagesSeen);
+    socket.on('messageRemoved', (messageId) => {
+      console.log('🗑️ Message removed:', messageId);
+      setMessages(prev => prev.filter(msg => msg._id !== messageId));
+    });
     
     // Typing indicators
     socket.on('typing', handleTyping);
@@ -656,6 +660,33 @@ useEffect(() => {
     setError(null);
   }, []);
 
+  // Delete message
+  const deleteMessage = useCallback(async (messageId) => {
+    try {
+      console.log('🗑️ Deleting message:', messageId);
+      
+      // Make API call to delete
+      await chatAPI.deleteMessage(messageId);
+      
+      // Remove from local state immediately
+      setMessages(prev => prev.filter(msg => msg._id !== messageId));
+      
+      // Emit socket event to notify other user
+      if (socket && isConnected && selectedUser) {
+        socket.emit('messageDeleted', {
+          messageId,
+          senderId: user.userId,
+          receiverId: selectedUser._id
+        });
+      }
+      
+      toast.success('Message deleted');
+    } catch (error) {
+      console.error('❌ Failed to delete message:', error);
+      toast.error('Failed to delete message');
+    }
+  }, [socket, isConnected, selectedUser, user]);
+
   // Context value
   // Context value
   const value = {
@@ -672,6 +703,7 @@ useEffect(() => {
     fetchUsers,
     selectUser,
     sendMessage,
+    deleteMessage,
     sendTyping,
     searchMessages,
     clearError,

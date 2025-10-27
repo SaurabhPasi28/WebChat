@@ -13,10 +13,36 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true,
+    required: function() {
+      // Content is required only if there's no file attachment
+      return !this.fileUrl;
+    },
     trim: true,
     maxlength: 2000
   },
+  // File attachment fields
+  fileUrl: {
+    type: String,
+    default: null
+  },
+  fileType: {
+    type: String,
+    enum: ['image', 'video', 'document', 'audio', 'other', null],
+    default: null
+  },
+  fileName: {
+    type: String,
+    default: null
+  },
+  fileSize: {
+    type: Number,
+    default: null
+  },
+  cloudinaryPublicId: {
+    type: String,
+    default: null
+  },
+  // Message status
   status: {
     type: String,
     enum: ['sent', 'delivered', 'read', 'failed'],
@@ -29,13 +55,10 @@ const messageSchema = new mongoose.Schema({
 }, { 
   timestamps: true,
   toJSON: {
-    virtuals: true,
-    transform: function(doc, ret) {
-      ret.id = ret._id;
-      delete ret._id;
-      delete ret.__v;
-      return ret;
-    }
+    virtuals: true
+  },
+  toObject: {
+    virtuals: true
   }
 });
 

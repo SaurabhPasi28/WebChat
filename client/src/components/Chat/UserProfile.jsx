@@ -1,11 +1,14 @@
 import { useChat } from '../../context/ChatContext';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function UserProfile() {
-  const { onlineUsers,selectedUser } = useChat();
+  const { onlineUsers, selectedUser } = useChat();
 
   if (!selectedUser) {
     return null;
   }
+
+  const isOnline = selectedUser.isOnline || onlineUsers.has(selectedUser._id);
 
   return (
     <div className="flex items-center p-4 w-full">
@@ -16,7 +19,7 @@ export default function UserProfile() {
             {selectedUser.username.charAt(0).toUpperCase()}
           </span>
         </div>
-        {(selectedUser.isOnline || onlineUsers.has(selectedUser._id)) && (
+        {isOnline && (
           <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-dark-bg"></div>
         )}
       </div>
@@ -26,9 +29,19 @@ export default function UserProfile() {
         <h3 className="font-semibold text-gray-900 dark:text-dark-text truncate">
           {selectedUser.username}
         </h3>
-        <p className="text-sm text-gray-500 dark:text-dark-textSecondary">
-          {(selectedUser.isOnline || onlineUsers.has(selectedUser._id)) ? 'Online' : 'Offline'}
-        </p>
+        {/* Online/Offline Status */}
+        {isOnline ? (
+          <p className="text-sm text-green-500 dark:text-green-400 font-medium">
+            Online
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 dark:text-dark-textSecondary">
+            {selectedUser.lastSeen 
+              ? `Last seen ${formatDistanceToNow(new Date(selectedUser.lastSeen), { addSuffix: true })}`
+              : 'Offline'
+            }
+          </p>
+        )}
       </div>
 
       {/* Actions */}

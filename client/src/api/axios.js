@@ -7,9 +7,18 @@ const api = axios.create({
 
 // Add request interceptor
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Get token from localStorage - it's stored in 'user' object
+  const userData = localStorage.getItem('user');
+  if (userData) {
+    try {
+      const user = JSON.parse(userData);
+      const token = user.token;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error parsing user data from localStorage:', error);
+    }
   }
   return config;
 }, (error) => {

@@ -107,6 +107,59 @@ export const configureSocket = (io) => {
       }
     });
 
+    // File message sent (after upload completes)
+    socket.on('fileMessageSent', async (messageId) => {
+      try {
+        const message = await Message.findById(messageId)
+          .populate('sender receiver', 'username avatar status');
+        
+        if (!message) {
+          console.error('❌ File message not found:', messageId);
+          return;
+        }
+
+        console.log(`📁 File message created from ${message.sender._id} to ${message.receiver._id}, ID: ${message._id}`);
+
+        // Check if receiver is online
+        const receiverSocket = Array.from(io.sockets.sockets.values()).find(
+          s => s.userId === message.receiver._id.toString()
+        );
+
+        if (receiverSocket) {
+          // Receiver is online - update to delivered
+          message.status = 'delivered';
+          await Message.findByIdAndUpdate(message._id, { status: 'delivered' });
+          
+          console.log(`✅ Receiver ${message.receiver._id} is online, file message marked as delivered`);
+          
+          // Send to receiver with 'delivered' status
+          io.to(message.receiver._id.toString()).emit('receiveMessage', message);
+          
+          // Notify sender that message was delivered
+          socket.emit('messageDelivered', { messageId: message._id, status: 'delivered' });
+          
+          console.log(`📤 File message delivered to ${message.receiver._id}`);
+        } else {
+          // Receiver is offline - keep as 'sent'
+          console.log(`⏸️ Receiver ${message.receiver._id} is offline, file message stays as 'sent'`);
+          
+          // Still send to receiver's room (will get when they connect)
+          io.to(message.receiver._id.toString()).emit('receiveMessage', message);
+        }
+      } catch (error) {
+        console.error('Error handling file message:', error);
+      }
+    });
+
+    // Message deleted
+    socket.on('messageDeleted', ({ messageId, senderId, receiverId }) => {
+      console.log(`🗑️ Message deleted: ${messageId}`);
+      
+      // Notify both users
+      io.to(senderId).emit('messageRemoved', messageId);
+      io.to(receiverId).emit('messageRemoved', messageId);
+    });
+
     // Typing indicators
     socket.on('typing', (receiverId) => {
       socket.to(receiverId).emit('typing', socket.userId);

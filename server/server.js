@@ -10,6 +10,7 @@ import hpp from 'hpp';
 import compression from 'compression';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import fileRoutes from './routes/fileRoutes.js';
 import { errorHandler } from './utils/errorHandler.js';
 import { configureSocket } from './utils/socketHandler.js';
 import dotenv from 'dotenv';
@@ -92,6 +93,7 @@ app.get('/api/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/file', fileRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

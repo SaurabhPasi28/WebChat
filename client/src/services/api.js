@@ -124,5 +124,11 @@ export const chatAPI = {
 
   getUserStatus: async (userId) => {
     return authFetch(`/chat/user/${userId}/status`);
+  },
+
+  deleteMessage: async (messageId) => {
+    return authFetch(`/file/message/${messageId}`, {
+      method: 'DELETE'
+    });
   }
 };

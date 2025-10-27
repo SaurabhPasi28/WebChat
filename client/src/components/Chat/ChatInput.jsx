@@ -2,18 +2,22 @@ import { useState, useEffect, useRef } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 import EmojiPicker from 'emoji-picker-react';
+import FileUpload from './FileUpload';
 import { 
   PaperAirplaneIcon, 
-  PaperClipIcon, 
   FaceSmileIcon,
   ExclamationTriangleIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
+import axios from '../../api/axios';
+import toast from 'react-hot-toast';
 
 export default function ChatInput() {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { sendMessage, selectedUser, sendTyping, socket, isConnected, connect } = useChat();
   const { user } = useAuth();
   const typingTimeoutRef = useRef(null);
@@ -48,9 +52,19 @@ export default function ChatInput() {
     };
   }, [message, sendTyping, isTyping]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (message.trim() && selectedUser) {
+    
+    if (!selectedUser) return;
+
+    // Handle file upload
+    if (selectedFile) {
+      await handleFileUpload();
+      return;
+    }
+
+    // Handle text message
+    if (message.trim()) {
       console.log('Submitting message:', message);
       console.log('Connection status:', isConnected);
       console.log('Socket available:', !!socket);
@@ -62,16 +76,63 @@ export default function ChatInput() {
     }
   };
 
+  const handleFileUpload = async () => {
+    if (!selectedFile || !selectedUser) return;
+
+    setIsUploading(true);
+    const uploadToast = toast.loading('Uploading file...');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('receiverId', selectedUser._id);
+      
+      if (message.trim()) {
+        formData.append('caption', message.trim());
+      }
+
+      console.log('📤 Uploading file:', selectedFile.name);
+      console.log('📤 Request data:', {
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type,
+        receiverId: selectedUser._id,
+        hasCaption: !!message.trim()
+      });
+
+      const response = await axios.post('/file/upload', formData, {
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          toast.loading(`Uploading... ${percentCompleted}%`, { id: uploadToast });
+        }
+      });
+
+      console.log('✅ File uploaded successfully:', response.data);
+
+      // Emit socket event for real-time delivery
+      if (socket && isConnected) {
+        socket.emit('fileMessageSent', response.data.message._id);
+      }
+
+      toast.success('File sent successfully!', { id: uploadToast });
+
+      // Clear state
+      setSelectedFile(null);
+      setMessage('');
+      inputRef.current?.focus();
+    } catch (error) {
+      console.error('❌ File upload error:', error);
+      toast.error(error.response?.data?.error || 'Failed to upload file', { id: uploadToast });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
-  };
-
-  const handleFileUpload = () => {
-    // TODO: Implement file upload functionality
-    console.log('File upload clicked');
   };
 
   const handleEmojiPicker = () => {
@@ -139,15 +200,11 @@ export default function ChatInput() {
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Message Input */}
         <div className="flex items-end space-x-2">
-          {/* Attachment Button */}
-          <button
-            type="button"
-            onClick={handleFileUpload}
-            className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border"
-            title="Attach file"
-          >
-            <PaperClipIcon className="h-5 w-5" />
-          </button>
+          {/* File Upload */}
+          <FileUpload 
+            onFileSelect={setSelectedFile} 
+            disabled={isUploading || !isConnected}
+          />
 
           {/* Message Input */}
           <div className="flex-1 relative">
@@ -156,9 +213,10 @@ export default function ChatInput() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={`Message ${selectedUser.username}...`}
+              placeholder={selectedFile ? 'Add a caption (optional)...' : `Message ${selectedUser.username}...`}
               rows={1}
-              className="w-full resize-none border border-gray-300 dark:border-dark-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text"
+              disabled={isUploading}
+              className="w-full resize-none border border-gray-300 dark:border-dark-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 minHeight: '44px',
                 maxHeight: '120px'
@@ -206,17 +264,21 @@ export default function ChatInput() {
           {/* Send Button */}
           <button
             type="submit"
-            disabled={!message.trim() }
+            disabled={(!message.trim() && !selectedFile) || isUploading}
             className={`
               p-3 rounded-lg transition-all duration-200 flex items-center justify-center
-              ${message.trim()
+              ${(message.trim() || selectedFile) && !isUploading
                 ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-md hover:shadow-lg transform hover:scale-105' 
                 : 'bg-gray-100 dark:bg-dark-border text-gray-400 dark:text-gray-500 cursor-not-allowed'
               }
             `}
-            title={!isConnected ? 'Connecting to server...' : 'Send message'}
+            title={!isConnected ? 'Connecting to server...' : isUploading ? 'Uploading...' : 'Send message'}
           >
-            <PaperAirplaneIcon className="h-5 w-5" />
+            {isUploading ? (
+              <ArrowPathIcon className="h-5 w-5 animate-spin" />
+            ) : (
+              <PaperAirplaneIcon className="h-5 w-5" />
+            )}
           </button>
         </div>
 

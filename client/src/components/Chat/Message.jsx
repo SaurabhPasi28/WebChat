@@ -5,8 +5,9 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import FileMessage from './FileMessage';
 
-export default function Message({ message, isOwnMessage, showAvatar }) {
+export default function Message({ message, isOwnMessage, showAvatar, onDeleteMessage }) {
   const { user } = useAuth();
 
   // Message status component
@@ -44,17 +45,29 @@ export default function Message({ message, isOwnMessage, showAvatar }) {
         <div className="relative">
           <div
             className={`
-              px-4 py-2 rounded-2xl shadow-soft dark:shadow-soft-dark relative
+              rounded-2xl shadow-soft dark:shadow-soft-dark relative
               ${isOwnMessage 
                 ? 'bg-primary-900 text-white rounded-br-md' 
                 : 'bg-gray-100 dark:bg-dark-surface text-gray-800 dark:text-dark-text rounded-bl-md border border-gray-200 dark:border-dark-border'
               }
+              ${message.fileUrl ? 'p-2' : 'px-4 py-2'}
             `}
           >
-            {/* Message content */}
-            <p className="text-sm break-words whitespace-pre-wrap">
-              {message.content}
-            </p>
+            {/* File attachment */}
+            {message.fileUrl ? (
+              <FileMessage 
+                message={message} 
+                isOwnMessage={isOwnMessage}
+                onDelete={onDeleteMessage}
+              />
+            ) : (
+              <>
+                {/* Text message content */}
+                <p className="text-sm break-words whitespace-pre-wrap">
+                  {message.content}
+                </p>
+              </>
+            )}
             
             {/* Message metadata */}
             <div className="flex justify-end items-center mt-1 space-x-1">
