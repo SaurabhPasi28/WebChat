@@ -45,8 +45,9 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Body parser with size limit
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+// Increased limit for file uploads (Note: Multer handles multipart/form-data separately)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Database connection with retry logic
 const connectWithRetry = async () => {

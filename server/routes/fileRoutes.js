@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate } from '../middleware/authMiddleware.js';
-import { upload } from '../middleware/upload.js';
+// Import serverless-compatible upload middleware
+import { upload } from '../middleware/uploadServerless.js';
 import { uploadFile, deleteMessage, getFileInfo } from '../controllers/fileController.js';
 
 const router = express.Router();

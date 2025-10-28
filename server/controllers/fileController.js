@@ -26,8 +26,10 @@ export const uploadFile = async (req, res) => {
 
     if (!receiverId) {
       console.error('❌ No receiverId in request');
-      // Clean up uploaded file
-      deleteLocalFile(req.file.path);
+      // Clean up uploaded file (only for disk storage)
+      if (req.file && req.file.path) {
+        deleteLocalFile(req.file.path);
+      }
       return res.status(400).json({ error: 'Receiver ID is required' });
     }
 
@@ -67,14 +69,32 @@ export const uploadFile = async (req, res) => {
 
     // Upload to Cloudinary
     console.log('☁️ Uploading to Cloudinary...');
-    const cloudinaryResult = await uploadToCloudinary(
-      req.file.path,
-      'webchat/messages',
-      resourceType
-    );
-
-    // Delete local file after upload
-    deleteLocalFile(req.file.path);
+    
+    // Check if file is in memory (Buffer) or disk (path)
+    // Memory storage is used for serverless platforms (Vercel, Render)
+    let cloudinaryResult;
+    if (req.file.buffer) {
+      // Buffer upload (serverless-friendly)
+      console.log('📦 Uploading from memory buffer (serverless mode)');
+      cloudinaryResult = await uploadToCloudinary(
+        req.file.buffer,
+        'webchat/messages',
+        resourceType,
+        req.file.originalname
+      );
+    } else {
+      // File path upload (local development)
+      console.log('📁 Uploading from file path (local mode)');
+      cloudinaryResult = await uploadToCloudinary(
+        req.file.path,
+        'webchat/messages',
+        resourceType,
+        req.file.originalname
+      );
+      
+      // Delete local file after upload (only for disk storage)
+      deleteLocalFile(req.file.path);
+    }
 
     if (!cloudinaryResult.success) {
       console.error('❌ Cloudinary upload failed:', cloudinaryResult.error);
@@ -112,7 +132,7 @@ export const uploadFile = async (req, res) => {
     console.error('❌ Error name:', error.name);
     console.error('❌ Error message:', error.message);
     
-    // Clean up local file if exists
+    // Clean up local file if exists (only for disk storage)
     if (req.file && req.file.path) {
       deleteLocalFile(req.file.path);
     }

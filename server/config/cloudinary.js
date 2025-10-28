@@ -12,34 +12,67 @@ cloudinary.config({
 
 /**
  * Upload file to Cloudinary
- * @param {string} filePath - Local file path or buffer
+ * @param {string|Buffer} filePathOrBuffer - Local file path or buffer (for serverless)
  * @param {string} folder - Cloudinary folder name
  * @param {string} resourceType - 'image', 'video', 'raw', 'auto'
+ * @param {string} originalFilename - Original filename (needed for buffer uploads)
  * @returns {Promise<object>} Upload result
  */
-export const uploadToCloudinary = async (filePath, folder = 'webchat', resourceType = 'auto') => {
+export const uploadToCloudinary = async (filePathOrBuffer, folder = 'webchat', resourceType = 'auto', originalFilename = null) => {
   try {
-    const result = await cloudinary.uploader.upload(filePath, {
+    let uploadOptions = {
       folder: folder,
       resource_type: resourceType,
-      // For large files
       chunk_size: 6000000,
-      // Generate unique filename
       use_filename: true,
       unique_filename: true,
-    });
-
-    return {
-      success: true,
-      url: result.secure_url,
-      publicId: result.public_id,
-      format: result.format,
-      resourceType: result.resource_type,
-      bytes: result.bytes,
-      width: result.width,
-      height: result.height,
-      duration: result.duration, // for videos
     };
+
+    // If buffer is provided, upload from buffer (serverless-friendly)
+    if (Buffer.isBuffer(filePathOrBuffer)) {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          uploadOptions,
+          (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              resolve({
+                success: false,
+                error: error.message
+              });
+            } else {
+              resolve({
+                success: true,
+                url: result.secure_url,
+                publicId: result.public_id,
+                format: result.format,
+                resourceType: result.resource_type,
+                bytes: result.bytes,
+                width: result.width,
+                height: result.height,
+                duration: result.duration,
+              });
+            }
+          }
+        );
+        uploadStream.end(filePathOrBuffer);
+      });
+    } else {
+      // Traditional file path upload (for local development)
+      const result = await cloudinary.uploader.upload(filePathOrBuffer, uploadOptions);
+
+      return {
+        success: true,
+        url: result.secure_url,
+        publicId: result.public_id,
+        format: result.format,
+        resourceType: result.resource_type,
+        bytes: result.bytes,
+        width: result.width,
+        height: result.height,
+        duration: result.duration,
+      };
+    }
   } catch (error) {
     console.error('Cloudinary upload error:', error);
     return {
