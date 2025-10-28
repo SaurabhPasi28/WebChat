@@ -1,8 +1,9 @@
 import { io } from 'socket.io-client';
 import { useEffect, useState, useCallback, useRef } from 'react';
 
-// Use relative URL to work with Vite proxy
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://yourdomain.com';
+// Use environment variable for socket URL
+// In production, this should be your Render backend URL
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 export const useSocket = () => {
   const [socket, setSocket] = useState(null);

@@ -10,6 +10,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+console.log('Cloudinary configured with cloud name:', process.env.CLOUDINARY_CLOUD_NAME);
+console.log('Cloudinary API Key:', process.env.CLOUDINARY_API_KEY ? '***' : 'Not Set');
+console.log('Cloudinary API Secret:', process.env.CLOUDINARY_API_SECRET ? '***' : 'Not Set'); 
+
 /**
  * Upload file to Cloudinary
  * @param {string|Buffer} filePathOrBuffer - Local file path or buffer (for serverless)

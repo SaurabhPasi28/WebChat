@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environment Variables Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .env-item {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+        }
+        .env-item.error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .label {
+            font-weight: bold;
+            color: #555;
+        }
+        .value {
+            margin-top: 5px;
+            padding: 8px;
+            background: #eee;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.ok {
+            background: #4CAF50;
+            color: white;
+        }
+        .status.error {
+            background: #f44336;
+            color: white;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        .test-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .test-result.success {
+            background: #e8f5e9;
+            border: 1px solid #4CAF50;
+        }
+        .test-result.failed {
+            background: #ffebee;
+            border: 1px solid #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Environment Configuration Check</h1>
+        <p>This page helps you verify that your environment variables are correctly configured.</p>
+        
+        <div id="envVars"></div>
+        
+        <button onclick="testConnection()">Test Backend Connection</button>
+        <div id="testResult"></div>
+        
+        <h2 style="margin-top: 30px;">Instructions</h2>
+        <ol>
+            <li>Deploy this file to Vercel with your frontend</li>
+            <li>Access it at: <code>https://your-app.vercel.app/env-check.html</code></li>
+            <li>Check that all environment variables are set correctly</li>
+            <li>Click "Test Backend Connection" to verify connectivity</li>
+        </ol>
+    </div>
+
+    <script>
+        // Get environment variables
+        const envVars = {
+            'VITE_API_URL': import.meta.env.VITE_API_URL,
+            'VITE_SOCKET_URL': import.meta.env.VITE_SOCKET_URL,
+            'MODE': import.meta.env.MODE,
+            'DEV': import.meta.env.DEV,
+            'PROD': import.meta.env.PROD
+        };
+
+        // Display environment variables
+        const container = document.getElementById('envVars');
+        let html = '';
+
+        for (const [key, value] of Object.entries(envVars)) {
+            const isSet = value !== undefined && value !== '';
+            const statusClass = isSet ? 'ok' : 'error';
+            const statusText = isSet ? 'SET' : 'NOT SET';
+            
+            html += `
+                <div class="env-item ${isSet ? '' : 'error'}">
+                    <div class="label">
+                        ${key} 
+                        <span class="status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="value">${value || '(not set)'}</div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+
+        // Test backend connection
+        async function testConnection() {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.innerHTML = '<p>Testing connection...</p>';
+            
+            const apiUrl = envVars.VITE_API_URL;
+            
+            if (!apiUrl) {
+                resultDiv.innerHTML = `
+                    <div class="test-result failed">
+                        <strong>❌ Error:</strong> VITE_API_URL is not set!
+                        <p>Please set this environment variable in Vercel.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Remove /api from the end to test health endpoint
+            const baseUrl = apiUrl.replace(/\/api$/, '');
+            const healthUrl = `${baseUrl}/api/health`;
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(healthUrl);
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <div class="test-result success">
+                            <strong>✅ Backend Connected!</strong>
+                            <p><strong>URL:</strong> ${healthUrl}</p>
+                            <p><strong>Response Time:</strong> ${duration}ms</p>
+                            <p><strong>Status:</strong> ${data.status || 'unknown'}</p>
+                            <p><strong>Database:</strong> ${data.database || 'unknown'}</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="test-result failed">
+                            <strong>❌ Connection Failed</strong>
+                            <p><strong>URL:</strong> ${healthUrl}</p>
+                            <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                            <p>The backend is reachable but returned an error.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result failed">
+                        <strong>❌ Connection Failed</strong>
+                        <p><strong>URL:</strong> ${healthUrl}</p>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>Check that your backend URL is correct and the service is running.</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

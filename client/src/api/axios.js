@@ -1,8 +1,11 @@
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
+// Use environment variable for API URL
+// In production (Vercel), this should be your Render backend URL
+// In development, it will use the local backend
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
 });
 
 // Add request interceptor
