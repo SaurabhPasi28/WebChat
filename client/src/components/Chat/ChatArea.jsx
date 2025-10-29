@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -11,6 +11,7 @@ export default function ChatArea({ onBack }) {
   const { selectedUser, messages, typingUsers, loading } = useChat();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function ChatArea({ onBack }) {
           </div>
         ) : (
           <div className="h-full overflow-y-auto bg-gradient-to-b from-gray-50 to-white dark:from-dark-bg dark:to-dark-surface">
-            <MessageList />
+            <MessageList onReplyMessage={setReplyingTo} />
             
             {/* Typing Indicator */}
             {isTyping && (
@@ -84,7 +85,7 @@ export default function ChatArea({ onBack }) {
 
       {/* Input Area */}
       <div className="flex-shrink-0 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border">
-        <ChatInput />
+        <ChatInput replyingTo={replyingTo} onCancelReply={() => setReplyingTo(null)} />
       </div>
     </div>
   );

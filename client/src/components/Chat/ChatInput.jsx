@@ -7,17 +7,19 @@ import {
   PaperAirplaneIcon, 
   FaceSmileIcon,
   ExclamationTriangleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import axios from '../../api/axios';
 import toast from 'react-hot-toast';
 
-export default function ChatInput() {
+export default function ChatInput({ replyingTo, onCancelReply }) {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
   const { sendMessage, selectedUser, sendTyping, socket, isConnected, connect } = useChat();
   const { user } = useAuth();
   const typingTimeoutRef = useRef(null);
@@ -58,7 +60,7 @@ export default function ChatInput() {
     if (!selectedUser) return;
 
     // Handle file upload
-    if (selectedFile) {
+    if (selectedFiles.length > 0) {
       await handleFileUpload();
       return;
     }
@@ -69,56 +71,75 @@ export default function ChatInput() {
       console.log('Connection status:', isConnected);
       console.log('Socket available:', !!socket);
       
-      sendMessage(message.trim());
+      sendMessage(message.trim(), null, replyingTo?._id);
       setMessage('');
       setIsTyping(false);
+      if (onCancelReply) onCancelReply();
       inputRef.current?.focus();
     }
   };
 
   const handleFileUpload = async () => {
-    if (!selectedFile || !selectedUser) return;
+    if (selectedFiles.length === 0 || !selectedUser) return;
 
     setIsUploading(true);
-    const uploadToast = toast.loading('Uploading file...');
+    const uploadToast = toast.loading(`Uploading ${selectedFiles.length} file(s)...`);
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('receiverId', selectedUser._id);
+      const uploadedMessages = [];
       
-      if (message.trim()) {
-        formData.append('caption', message.trim());
-      }
+      // Upload each file sequentially
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        
+        // Update progress for current file
+        setUploadProgress(prev => ({
+          ...prev,
+          [file.name]: 0
+        }));
 
-      console.log('📤 Uploading file:', selectedFile.name);
-      console.log('📤 Request data:', {
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size,
-        fileType: selectedFile.type,
-        receiverId: selectedUser._id,
-        hasCaption: !!message.trim()
-      });
-
-      const response = await axios.post('/file/upload', formData, {
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          toast.loading(`Uploading... ${percentCompleted}%`, { id: uploadToast });
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('receiverId', selectedUser._id);
+        
+        // Add caption only to the first file
+        if (i === 0 && message.trim()) {
+          formData.append('caption', message.trim());
         }
-      });
 
-      console.log('✅ File uploaded successfully:', response.data);
+        console.log(`📤 Uploading file ${i + 1}/${selectedFiles.length}:`, file.name);
 
-      // Emit socket event for real-time delivery
-      if (socket && isConnected) {
-        socket.emit('fileMessageSent', response.data.message._id);
+        const response = await axios.post('/file/upload', formData, {
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(prev => ({
+              ...prev,
+              [file.name]: percentCompleted
+            }));
+            toast.loading(`Uploading ${i + 1}/${selectedFiles.length}... ${percentCompleted}%`, { id: uploadToast });
+          }
+        });
+
+        console.log(`✅ File ${i + 1} uploaded successfully:`, response.data);
+        const uploadedMessage = response.data.message;
+        uploadedMessages.push(uploadedMessage);
+
+        // IMPORTANT: Add the uploaded message to the sender's UI immediately
+        sendMessage(null, uploadedMessage);
+
+        // Emit socket event for real-time delivery to receiver
+        if (socket && isConnected) {
+          socket.emit('fileMessageSent', uploadedMessage._id);
+        }
       }
 
-      toast.success('File sent successfully!', { id: uploadToast });
+      toast.success(`${selectedFiles.length} file(s) sent successfully!`, { id: uploadToast });
 
-      // Clear state
-      setSelectedFile(null);
+      // Clear state and local storage
+      setSelectedFiles([]);
+      setUploadProgress({});
       setMessage('');
+      localStorage.removeItem('unsent_files_metadata');
       inputRef.current?.focus();
     } catch (error) {
       console.error('❌ File upload error:', error);
@@ -197,14 +218,37 @@ export default function ChatInput() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-2">
+        {/* Reply Preview */}
+        {replyingTo && (
+          <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">
+                Replying to {replyingTo.sender.username}
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                {replyingTo.content || '📎 Attachment'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="ml-2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* Message Input */}
-        <div className="flex items-end space-x-2">
-          {/* File Upload */}
+        <div className='w-full flex items-center'>
           <FileUpload 
-            onFileSelect={setSelectedFile} 
+            onFilesSelect={setSelectedFiles}
+            selectedFiles={selectedFiles}
             disabled={isUploading || !isConnected}
           />
+        <div className="flex w-full justify-center items-center space-x-2">
+          {/* File Upload */}
 
           {/* Message Input */}
           <div className="flex-1 relative">
@@ -213,7 +257,7 @@ export default function ChatInput() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={selectedFile ? 'Add a caption (optional)...' : `Message ${selectedUser.username}...`}
+              placeholder={selectedFiles.length > 0 ? 'Add a caption (optional)...' : `Message ${selectedUser.username}...`}
               rows={1}
               disabled={isUploading}
               className="w-full resize-none border border-gray-300 dark:border-dark-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text disabled:opacity-50 disabled:cursor-not-allowed"
@@ -237,7 +281,7 @@ export default function ChatInput() {
               }`}
               title="Add emoji"
             >
-              <FaceSmileIcon className="h-5 w-5" />
+              <FaceSmileIcon className="h-8 w-8" />
             </button>
             
             {/* Emoji Picker Popup */}
@@ -264,10 +308,10 @@ export default function ChatInput() {
           {/* Send Button */}
           <button
             type="submit"
-            disabled={(!message.trim() && !selectedFile) || isUploading}
+            disabled={(!message.trim() && selectedFiles.length === 0) || isUploading}
             className={`
               p-3 rounded-lg transition-all duration-200 flex items-center justify-center
-              ${(message.trim() || selectedFile) && !isUploading
+              ${(message.trim() || selectedFiles.length > 0) && !isUploading
                 ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-md hover:shadow-lg transform hover:scale-105' 
                 : 'bg-gray-100 dark:bg-dark-border text-gray-400 dark:text-gray-500 cursor-not-allowed'
               }
@@ -280,6 +324,7 @@ export default function ChatInput() {
               <PaperAirplaneIcon className="h-5 w-5" />
             )}
           </button>
+        </div>
         </div>
 
         {/* Typing Status */}

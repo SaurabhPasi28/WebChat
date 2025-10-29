@@ -127,7 +127,7 @@ export const chatAPI = {
   },
 
   deleteMessage: async (messageId) => {
-    return authFetch(`/file/message/${messageId}`, {
+    return authFetch(`/chat/messages/${messageId}`, {
       method: 'DELETE'
     });
   }

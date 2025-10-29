@@ -177,3 +177,38 @@ export const getUserStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+export const deleteMessage = async (req, res, next) => {
+  try {
+    const { userId } = req.user;
+    const { messageId } = req.params;
+
+    // Validate messageId
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      throw createError(400, 'Invalid message ID');
+    }
+
+    // Find the message
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      throw createError(404, 'Message not found');
+    }
+
+    // Check if user is the sender
+    if (message.sender.toString() !== userId) {
+      throw createError(403, 'You can only delete your own messages');
+    }
+
+    // Delete the message
+    await Message.findByIdAndDelete(messageId);
+
+    res.json({ 
+      success: true, 
+      message: 'Message deleted successfully',
+      messageId 
+    });
+  } catch (error) {
+    next(error);
+  }
+};

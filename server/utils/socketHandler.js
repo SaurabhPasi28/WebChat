@@ -58,17 +58,21 @@ export const configureSocket = (io) => {
     });
 
     // Send message
-    socket.on('sendMessage', async ({ senderId, receiverId, content }) => {
+    socket.on('sendMessage', async ({ senderId, receiverId, content, repliedTo }) => {
       try {
         const message = new Message({
           sender: senderId,
           receiver: receiverId,
           content,
-          status: 'sent'
+          status: 'sent',
+          ...(repliedTo && { repliedTo })
         });
         
         await message.save();
         await message.populate('sender receiver', 'username avatar status');
+        if (repliedTo) {
+          await message.populate('repliedTo');
+        }
         
         console.log(`💬 Message created from ${senderId} to ${receiverId}, ID: ${message._id}`);
         

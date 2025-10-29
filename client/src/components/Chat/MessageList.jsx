@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import Message from './Message';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
-export default function MessageList() {
+export default function MessageList({ onReplyMessage }) {
   const { messages, selectedUser, loading, deleteMessage } = useChat();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
@@ -138,6 +138,7 @@ export default function MessageList() {
                   showAvatar={showAvatar}
                   isLastMessage={isLastMessage}
                   onDeleteMessage={deleteMessage}
+                  onReplyMessage={onReplyMessage}
                 />
               </div>
             );

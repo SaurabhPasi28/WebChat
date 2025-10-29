@@ -51,6 +51,12 @@ const messageSchema = new mongoose.Schema({
   readAt: {
     type: Date,
     default: null
+  },
+  // Reply functionality
+  repliedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null
   }
 }, { 
   timestamps: true,

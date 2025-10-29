@@ -594,12 +594,21 @@ export const ChatProvider = ({ children }) => {
 
   const UNSENT_MESSAGES_KEY = 'unsentMessages';
 
-const sendMessage = useCallback((content) => {
+const sendMessage = useCallback((content, uploadedFileMessage = null, replyToId = null) => {
+  // Handle file messages uploaded via API
+  if (uploadedFileMessage) {
+    console.log('📁 Adding uploaded file message to sender UI:', uploadedFileMessage._id);
+    setMessages(prev => [...prev, uploadedFileMessage]);
+    return;
+  }
+
+  // Handle text messages via socket
   const payload = {
     senderId: user.userId,
     receiverId: selectedUser?._id,
     content,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    ...(replyToId && { repliedTo: replyToId })
   };
 
   if (socket && isConnected && selectedUser && user && content.trim()) {
@@ -613,7 +622,8 @@ const sendMessage = useCallback((content) => {
       content,
       createdAt: payload.createdAt,
       isTemp: true,
-      status: 'sent'
+      status: 'sent',
+      ...(replyToId && { repliedTo: replyToId })
     };
 
     // Add temp message to UI immediately
@@ -622,7 +632,6 @@ const sendMessage = useCallback((content) => {
     // Send to server - server will handle status updates via socket events
     socket.emit('sendMessage', payload);
     
-    // DON'T set timeout - let socket events handle status updates!
     console.log('📤 Message sent to server, waiting for confirmation...');
     
   } else {
